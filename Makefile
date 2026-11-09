@@ -3,7 +3,7 @@ GOODWARE ?= tests/goodware
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-dev)
 
 .PHONY: help setup setup-dev lint fmt fmt-check test goodware report compat bundles changelog \
-        coverage coverage-check health health-check fp-corpus fp-report fp-compare fp-baseline \
+        coverage coverage-check health health-check fp-corpus fp-report fp-compare fp-baseline fp-propose \
         anchors memscan quality pytest ci fixtures hunt clean
 
 help:
@@ -21,6 +21,7 @@ help:
 	@echo "health      regenera docs/health.md (FP, idade, último match, candidatas a deprecated)"
 	@echo "fp-corpus   baixa o corpus pip fixado por hash em build/fp-corpus (fp-report/fp-compare: o resto do vigia)"
 	@echo "fp-baseline aceita REPORT=build/report.json como tests/goodware/baseline.json"
+	@echo "fp-propose  ARTIFACT=<zip|dir do fp-watch-<run>>: baseline do runner no working tree, para revisar e abrir PR"
 	@echo "anchors     extrai âncoras de SAMPLES=... (ex.: make anchors SAMPLES='a.exe b.exe' FAMILY=X)"
 	@echo "memscan     escaneia IMAGE=... com as regras de escopo memory/both"
 	@echo "quality     ruff + mypy + pytest + bandit"
@@ -92,6 +93,15 @@ fp-compare: fp-report
 fp-baseline:
 	$(PYTHON) scripts/fp_watch.py baseline --report $(REPORT) $(if $(wildcard build/manifest.json),--manifest build/manifest.json,)
 	$(PYTHON) scripts/health.py
+
+# Re-baseline a partir do artifact do runner (gh run download <id> -n fp-watch-<id> -D build/artifact).
+# Só altera o working tree; quem aceita o FP revisa o diff, commita e abre o PR.
+fp-propose:
+	@test -n "$(ARTIFACT)" || (echo "uso: make fp-propose ARTIFACT=build/artifact (zip ou diretório)"; exit 2)
+	$(PYTHON) scripts/fp_watch.py baseline --from-artifact $(ARTIFACT)
+	$(PYTHON) scripts/health.py
+	@git --no-pager diff --stat -- tests/goodware/baseline.json docs/health.md
+	@echo "revise: git diff tests/goodware/baseline.json docs/health.md; depois commit + PR"
 
 anchors:
 	@test -n "$(SAMPLES)" || { echo "use: make anchors SAMPLES='a.exe b.exe' FAMILY=FamilyX [GOODWARE=dir]"; exit 1; }

@@ -15,6 +15,10 @@ on:
         description: "Abrir/atualizar a issue fp-regression se houver regressão"
         type: boolean
         default: true
+      propose_baseline:
+        description: "Gerar baseline.proposed.json + baseline.patch no artifact (nada é commitado; aceitar FP é decisão humana)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -81,6 +85,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/fp_watch.py issue --diff build/diff.json --markdown build/diff.md --repo "$GITHUB_REPOSITORY"
 
+      - name: Propor baseline do runner (patch no artifact; NUNCA commita)
+        if: ${{ inputs.propose_baseline }}
+        run: |
+          cp tests/goodware/baseline.json build/baseline.current.json
+          python scripts/fp_watch.py baseline --report build/report.json --manifest build/manifest.json \
+            --out build/baseline.proposed.json
+          python scripts/health.py --baseline build/baseline.proposed.json --out build/health.proposed.md
+          git diff --no-index --src-prefix=a/ --dst-prefix=b/ \
+            tests/goodware/baseline.json build/baseline.proposed.json \
+            | sed 's#build/baseline.proposed.json#tests/goodware/baseline.json#' > build/baseline.patch || true
+          {
+            echo "## Baseline proposta (não commitada)"
+            echo
+            echo 'Revise e aplique localmente: `gh run download ${{ github.run_id }} -n fp-watch-${{ github.run_id }} -D build/artifact && make fp-propose ARTIFACT=build/artifact`'
+            echo
+            echo '```diff'
+            head -c 20000 build/baseline.patch
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -90,6 +114,10 @@ jobs:
             build/manifest.json
             build/diff.json
             build/diff.md
+            build/baseline.proposed.json
+            build/baseline.patch
+            build/health.proposed.md
+          if-no-files-found: ignore
           retention-days: 90
 
       - name: Falhar o job se houve regressão

@@ -39,8 +39,18 @@ que mudou e por quê (FP novo? build novo da família? aperto/alargamento?).
 Quando o vigia semanal (`fp-watch.yml`) abrir uma issue `fp-regression`: a issue traz arquivo,
 sha256 e strings que casaram. Corrija a regra (ou aceite o FP conscientemente com
 `make fp-baseline REPORT=...` a partir do artifact do run), commite, e o próximo run fecha a issue.
-Depois de um hunting real, `scripts/hunt.py --record-activity` registra o match em
-`tests/activity.json`; é o que tira a regra da lista "sem prova" do `docs/health.md`.
+Para re-baselinar a partir do runner: rode o `fp-watch` com `propose_baseline: true`, baixe o
+artifact e `make fp-propose ARTIFACT=build/artifact`; revise o diff e abra o PR. Nada é
+auto-commitado.
+Depois de um hunting real, `scripts/hunt.py --record-activity` (arquivos) ou
+`scripts/memscan.py --record-activity` (memória) registra o match em `tests/activity.json`; é o que
+tira a regra da lista "sem prova" do `docs/health.md`.
+
+Famílias públicas: só com strings e hashes de relatórios de fornecedores citados no `meta`
+(`reference`, comentários), nunca com amostra no repo. Se não der para fazer isso com confiança
+alta e risco de FP baixo, não entra. O EICAR é o único alvo cuja fixture é o próprio arquivo
+publicado, e mesmo ele só existe em hex: `tests/test_eicar.py` falha se o literal aparecer em
+qualquer arquivo versionado.
 
 ## Checklist anti-FP (vai no PR)
 
