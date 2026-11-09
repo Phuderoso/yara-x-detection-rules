@@ -66,7 +66,7 @@ def build_bundle(
             selected.append((f, infos))
 
     header = (
-        f"// yara-rules bundle: {name}\n"
+        f"// yara-x-detection-rules bundle: {name}\n"
         f"// version: {version}\n"
         f"// generated: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
         f"// purposes: {', '.join(purposes)}  (status=deprecated excluídas)\n"

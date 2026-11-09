@@ -73,7 +73,9 @@ def parse_lock(path: Path) -> list[Sample]:
 
 def mb_download(sha256: str, api_key: str) -> bytes:
     data = urllib.parse.urlencode({"query": "get_file", "sha256_hash": sha256}).encode()
-    req = urllib.request.Request(MB_API, data=data, headers={"Auth-Key": api_key, "User-Agent": "yara-rules-ci"})
+    req = urllib.request.Request(
+        MB_API, data=data, headers={"Auth-Key": api_key, "User-Agent": "yara-x-detection-rules-ci"}
+    )
     # URL fixa (constante MB_API, https); o esquema não vem de input.
     with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 # nosec B310
         body: bytes = resp.read(MAX_SAMPLE_BYTES + 1)

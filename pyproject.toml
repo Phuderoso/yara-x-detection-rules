@@ -1,5 +1,5 @@
 [project]
-name = "yara-rules"
+name = "yara-x-detection-rules"
 version = "0.0.0"
 description = "YARA-X detection-engineering repo: rules that survive clean corpora, new family builds, and noisy hunting pipelines. CC0."
 license = { text = "CC0-1.0" }

@@ -1,4 +1,4 @@
-# yara-rules
+# yara-x-detection-rules
 
 **Repositório de detection engineering em YARA-X: regras que sobrevivem a corpus limpo, a builds novos da família e a pipelines de hunting barulhentos. CC0.**
 
@@ -26,7 +26,7 @@ Além da CI, o repo traz duas ferramentas que normalmente ficam no notebook do a
 wildcards automáticos só nos operandos que variam, e [`scripts/memscan.py`](scripts/memscan.py)
 roda só as regras de escopo de memória em dumps e imagens (Volatility 3).
 
-> Os badges apontam para `Phuderoso/yara-x-detection-rules`; ajuste se o repositório tiver outro nome.
+[![fp-watch](https://github.com/Phuderoso/yara-x-detection-rules/actions/workflows/fp-watch.yml/badge.svg)](https://github.com/Phuderoso/yara-x-detection-rules/actions/workflows/fp-watch.yml) roda toda semana contra um corpus limpo reprodutível e abre uma única issue `fp-regression` quando uma regra stable/test começa a acender em goodware. A saúde das regras (FP, último match verdadeiro, candidatas a deprecated) está em [`docs/health.md`](docs/health.md) (gerado).
 
 ## Doutrina
 
@@ -55,7 +55,8 @@ flowchart LR
     H --> J[memória\nmemscan.py → raw / Volatility 3]
     I -.->|FP / bypass / telemetria| B
     J -.->|FP / bypass / telemetria| B
-    B -.-> K[docs/coverage.md\nMITRE · purpose × status\nscope · família · experimentais > 90d]
+    W[fp-watch semanal\nrunner + corpus pip por hash\nvs baseline.json] -.->|issue única fp-regression| B
+    B -.-> K[docs/coverage.md · docs/health.md\nMITRE · purpose × status · scope\nFP · último match · candidatas a deprecated]
 ```
 
 ## Quickstart
@@ -103,6 +104,8 @@ scripts/
   hunt.py                     varredura operacional: sha256, strings/offsets, JSONL nativo ou ECS
   memscan.py                  memória: só regras scope memory/both; backend raw (chunks) ou Volatility 3
   coverage.py                 gera docs/coverage.md do meta; a CI falha se estiver desatualizado
+  health.py                   gera docs/health.md (FP, idade, último match, candidatas a deprecated); conferido na CI
+  fp_watch.py                 vigia de FP: corpus pip fixado por hash, comparação com baseline, issue única
   build_bundles.py            bundles por purpose (.yar + .yarc) + manifest + SHA256SUMS
   changelog.py                CHANGELOG a partir de commits e do diff de rules/ entre tags
   compat_yara4.py             matriz de compatibilidade com YARA 4.x (yara-python)
@@ -115,13 +118,16 @@ tests/
   test_anchors.py             aceitação do extrator: acha o $decode da FamilyX sozinho
   test_memscan.py             dump sintético, chunks sobrepostos, ECS, parse da saída do vol3
   samples.lock                sha256 + família + fonte de amostras reais (sem binário)
-  test_lint.py, test_tooling.py   pytest do tooling
-  goodware/                   corpus limpo local (ignorado pelo git) + manifests/ fixados
+  activity.json               último match verdadeiro por regra (hunt.py --record-activity); alimenta docs/health.md
+  test_lint.py, test_tooling.py, test_fp_watch.py, test_health.py   pytest do tooling
+  goodware/                   corpus limpo local (ignorado pelo git) + manifests/, baseline.json, pip-corpus.txt
 journal/                      diário da construção, estilo case-files, um arquivo por dia
 .github/workflows/ci.yml      lint → fixtures → goodware ELF → diff vs base → goodware PE (windows)
 .github/workflows/release.yml tag v* → bundles → cosign → GitHub Release
+.github/workflows/fp-watch.yml semanal: corpus limpo reprodutível → regras stable/test → baseline → uma issue
 docs/handbook.md              o ofício
 docs/coverage.md              painel gerado (MITRE, purpose × status, scope, família, experimentais > 90d)
+docs/health.md                painel gerado (status, idade, FP, último match, candidatas a deprecated)
 ```
 
 Nenhum binário é versionado: fixtures são geradas em memória por `fakepe.py`; goodware e
@@ -163,7 +169,7 @@ Validado por `scripts/lint_rules.py`; a CI quebra o PR se falhar.
 
 1. **código**: ruff, ruff format, mypy (strict), pytest (lint, tooling, extrator de âncoras,
    memscan), bandit, pip-audit.
-2. **regras**: lint → fixtures → `docs/coverage.md` em dia → goodware ELF do runner → `report.py` no head **e** no base
+2. **regras**: lint → fixtures → `docs/coverage.md` e `docs/health.md` em dia → goodware ELF do runner → `report.py` no head **e** no base
    (mesmos scripts, regras do base) → `diff_report.py` publica como comentário no PR e no job
    summary: hits novos/removidos por regra (com sha256), tempo por regra com Δ%, fixtures que
    mudaram. Falha se uma regra passar de `max_rule_seconds`, regredir mais de
@@ -224,6 +230,38 @@ detectado e traz PID/processo; `auto` tenta vol3 e cai para raw. Saída JSONL na
 (`event.category: [malware, process]`, `yara.memory.offset`, `process.pid`). O porquê está na
 seção "Memória" do handbook.
 
+## Vigia de FP (`fp-watch.yml`)
+
+Regra limpa hoje pode começar a acender mês que vem: a imagem do runner mudou, uma biblioteca nova
+saiu, a regra foi afrouxada. `fp-watch.yml` roda toda quarta (e por `workflow_dispatch`):
+
+1. **Corpus limpo reprodutível**: `/usr/bin`, `/usr/sbin`, `/usr/lib/x86_64-linux-gnu`, `/usr/libexec`
+   do `ubuntu-latest`, mais as wheels de `tests/goodware/pip-corpus.txt`, fixadas por versão **e**
+   sha256 (`pip download --require-hashes`, descompactadas, nunca instaladas). `corpus_manifest.py`
+   registra o sha256 de cada arquivo, então drift da imagem aparece como diff, não como mistério.
+2. **Scan só com regras stable e test** (`--status stable,test`): `scan_goodware.py` para o gate,
+   `report.py` para hits com sha256 e tempo por regra.
+3. **Comparação com `tests/goodware/baseline.json`**: hit cujo sha256 não está em `known_fp` da regra
+   é FP novo (regressão em `triage`/`blocking`, aviso em `hunting`); tempo acima de `max_rule_seconds`
+   ou mais de `max_regression_pct` sobre a baseline (acima do piso de ruído) é regressão. FP conhecido
+   que sumiu é listado como informativo.
+4. **Uma issue, sem spam**: `fp_watch.py issue` procura a issue aberta com rótulo `fp-regression` e o
+   marcador dele. Mesmo diff → nenhuma escrita (digest no corpo). Diff diferente → edita o corpo. Run
+   limpo → um comentário e fecha. Só o `GITHUB_TOKEN` padrão, com `contents: read` e `issues: write`.
+
+Para aceitar o estado atual como baseline, depois de corrigir ou tolerar conscientemente um FP:
+`make fp-baseline REPORT=build/report.json` (o report está no artifact do run) e commit.
+`baseline.json` guarda também `last_fp` e `fp_total` por regra, que alimentam o painel de saúde.
+
+## Painel de saúde
+
+`docs/health.md` é gerado por `scripts/health.py`: por regra, status, purpose, scope, idade, tempo
+desde a última mudança, FP conhecidos, FP total histórico, último FP (da baseline) e último match
+verdadeiro (de `tests/activity.json`, escrito por `hunt.py --record-activity` ou à mão depois de um
+IR). Regra com FP registrado e sem match verdadeiro em 12 semanas entra em **candidatas a
+deprecated**; regra `test`/`stable` sem FP nem match entra em "sem prova". Idades em faixas, para o
+arquivo só mudar quando uma regra cruza uma; a CI roda `--check` como faz com o coverage.
+
 ## Painel de cobertura
 
 `docs/coverage.md` é gerado por `scripts/coverage.py` a partir do `meta`: regras por técnica
@@ -245,6 +283,9 @@ bater com o gerado; `make coverage` regenera.
 | `event.severity` | `severity` (low 21, medium 47, high 73, critical 99) |
 | `yara.strings[]` | id/offset/length de cada string casada |
 | `yara.scope`, `yara.memory.offset`, `process.pid` | `memscan.py`: escopo da regra, offset na imagem e PID (vol3) |
+
+`hunt.py --record-activity` marca as regras que casaram com a data de hoje em `tests/activity.json`
+(fonte `hunt`); é isso que `docs/health.md` chama de "último match".
 
 ## YARA-X
 
