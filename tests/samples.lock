@@ -19,3 +19,10 @@
 # linha (comentado) com o formato:
 #
 # 0000000000000000000000000000000000000000000000000000000000000000	FamilyX	malwarebazaar	MAL_Win_Loader_FamilyX_ConfigMarker	semente, build 2026-09
+#
+# WannaCry (2017-05): hashes citados em Cisco Talos (blog.talosintelligence.com/wannacry),
+# Kaspersky Securelist (78351) e CISA TA17-132A. NÃO confirmados no MalwareBazaar nesta
+# sessão (a API exige chave); fetch_samples.py confere o sha256 do arquivo baixado antes
+# do scan, então um hash errado falha em vez de passar em silêncio.
+ed01ebfbc9eb5bbea545af4d01bf5f1071661840480439c6e5babe8e080e41aa	WannaCry	talos,securelist,cisa-ta17-132a	MAL_Win_Ransomware_WannaCry_Strings	tasksche.exe (dropper do encryptor, zip embutido WNcry@2ol7)
+24d004a104d4d54034dbcffc2a4b19a11f39008a575aa614ea04703480b1022c	WannaCry	talos,securelist,cisa-ta17-132a	MAL_Win_Ransomware_WannaCry_Strings	mssecsvc.exe (worm SMB, kill switch)

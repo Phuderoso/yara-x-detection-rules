@@ -16,10 +16,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from eicar import eicar, eicar_zip
 from fakepe import build_pe, cstrings
 
 FAMILYX = "MAL_Win_Loader_FamilyX_ConfigMarker"
 FAMILYX_MEM = "MAL_Win_Loader_FamilyX_InMemory"
+EICAR_FILE = "TEST_Multi_EICAR_File"
+EICAR_ZIP = "TEST_Multi_EICAR_InZip_Stored"
+WANNACRY = "MAL_Win_Ransomware_WannaCry_Strings"
+ALL_RULES = [FAMILYX, FAMILYX_MEM, EICAR_FILE, EICAR_ZIP, WANNACRY]
+
+
+def _except(*names: str) -> list[str]:
+    return [r for r in ALL_RULES if r not in names]
+
 
 # Stub do decoder da Family X: `48 8B 0D [4] 48 85 C9 74 ?? 0F B6 01 34 ?? 88 01 48 FF C1`
 # Duas "compilações" com disp32/rel8/immediate diferentes, para provar que os
@@ -140,5 +150,98 @@ CASES: list[Case] = [
         build=lambda: build_pe(rdata=cstrings("CONFIG_START::mutex_id::", *INJECT_APIS), extra_sections=10, seed=24),
         expect_no_match=[FAMILYX, FAMILYX_MEM],
         note="13 seções: fora do envelope estrutural",
+    ),
+    # ---- EICAR: o alvo publicado, gerado em memória (tests/eicar.py) ----
+    Case(
+        name="eicar_published_68_bytes",
+        build=eicar,
+        expect_match=[EICAR_FILE],
+        expect_no_match=_except(EICAR_FILE),
+        note="os 68 bytes publicados; sha256 conferido em tests/test_eicar.py",
+    ),
+    Case(
+        name="eicar_with_trailing_whitespace",
+        build=lambda: eicar(b"\r\n" + b" " * 40),
+        expect_match=[EICAR_FILE],
+        expect_no_match=_except(EICAR_FILE),
+        note="a especificação permite espaço em branco depois, até 128 bytes no total",
+    ),
+    Case(
+        name="eicar_in_zip_stored",
+        build=lambda: eicar_zip(stored=True),
+        expect_match=[EICAR_ZIP],
+        expect_no_match=_except(EICAR_ZIP),
+        note="zip sem compressão: o YARA vê os bytes",
+    ),
+    Case(
+        name="eicar_in_zip_stored_second_member",
+        build=lambda: eicar_zip(stored=True, name="samples/eicar.com", padding=3),
+        expect_match=[EICAR_ZIP],
+        expect_no_match=_except(EICAR_ZIP),
+        note="não é o primeiro membro e tem nome com diretório",
+    ),
+    Case(
+        name="eicar_in_zip_deflated_is_opaque",
+        build=lambda: eicar_zip(stored=False),
+        expect_no_match=ALL_RULES,
+        note="limite documentado: zip deflatado não casa; o YARA-X não inflaciona. Precisa de unpacker antes",
+    ),
+    Case(
+        name="eicar_string_inside_document",
+        build=lambda: b"AV test notes\n" * 20 + eicar() + b"\n" + b"more notes\n" * 20,
+        expect_no_match=ALL_RULES,
+        note="a string no meio de um texto (relatório, .yar, dump de AV): não é o arquivo de teste",
+    ),
+    Case(
+        name="eicar_at_zero_but_file_too_big",
+        build=lambda: eicar() + b"\n" + b"x" * 200,
+        expect_no_match=ALL_RULES,
+        note="começa com o EICAR mas passa de 128 bytes: fora da especificação",
+    ),
+    # ---- WannaCry: strings de relatórios públicos em PE sintético; nenhuma amostra ----
+    Case(
+        name="wannacry_worm_killswitch",
+        build=lambda: build_pe(
+            rdata=cstrings("http://www.iuqerfsodp9ifjaposdfjhgosurijfaewrwergwea.com", "mssecsvc2.0", "tasksche.exe"),
+            seed=61,
+        ),
+        expect_match=[WANNACRY],
+        expect_no_match=_except(WANNACRY),
+        note="componente worm: kill switch + nome do serviço",
+    ),
+    Case(
+        name="wannacry_dropper_zip_password",
+        build=lambda: build_pe(rdata=cstrings("WNcry@2ol7"), seed=62),
+        expect_match=[WANNACRY],
+        expect_no_match=_except(WANNACRY),
+        note="só a senha do zip embutido basta",
+    ),
+    Case(
+        name="wannacry_components_pair",
+        build=lambda: build_pe(rdata=cstrings("c.wnry", "r.wnry", "t.wnry", "u.wnry", "@WanaDecryptor@.exe"), seed=63),
+        expect_match=[WANNACRY],
+        expect_no_match=_except(WANNACRY),
+        note="dois ou mais nomes de componente num PE",
+    ),
+    Case(
+        name="wannacry_ioc_list_text",
+        build=lambda: (
+            b"WannaCry IOCs\niuqerfsodp9ifjaposdfjhgosurijfaewrwergwea\nWNcry@2ol7\nmssecsvc2.0\ntasksche.exe\nc.wnry\n"
+            * 50
+        ),
+        expect_no_match=ALL_RULES,
+        note="lista de IOC em texto: sem MZ, não casa. É o FP clássico de regra de ransomware",
+    ),
+    Case(
+        name="wannacry_single_weak_string_in_pe",
+        build=lambda: build_pe(rdata=cstrings("tasksche.exe", *INJECT_APIS), seed=64),
+        expect_no_match=ALL_RULES,
+        note="um nome de componente só, num PE: ferramenta de resposta/limpeza, não a família",
+    ),
+    Case(
+        name="wannacry_strings_in_huge_pe",
+        build=lambda: build_pe(rdata=cstrings("WNcry@2ol7", "c.wnry", "r.wnry"), min_size=9 * 1024 * 1024, seed=65),
+        expect_no_match=ALL_RULES,
+        note="acima de 8MB: fora do envelope dos componentes públicos (ex.: instalador de AV com assinaturas embutidas)",
     ),
 ]

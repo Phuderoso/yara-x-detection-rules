@@ -25,7 +25,37 @@
       "status": "test",
       "purpose": "triage",
       "version": "2",
-      "seconds": 0.1256,
+      "seconds": 0.1274,
+      "known_fp": [],
+      "last_fp": null,
+      "fp_total": 0
+    },
+    "MAL_Win_Ransomware_WannaCry_Strings": {
+      "id": "1ad79fe1-7886-4d78-b8b7-6c6498b99e98",
+      "status": "test",
+      "purpose": "triage",
+      "version": "1",
+      "seconds": 0.0024,
+      "known_fp": [],
+      "last_fp": null,
+      "fp_total": 0
+    },
+    "TEST_Multi_EICAR_File": {
+      "id": "557866dc-2447-4b56-b1ca-141721779893",
+      "status": "test",
+      "purpose": "triage",
+      "version": "1",
+      "seconds": 0.0033,
+      "known_fp": [],
+      "last_fp": null,
+      "fp_total": 0
+    },
+    "TEST_Multi_EICAR_InZip_Stored": {
+      "id": "0d85cd57-3805-4b9b-9905-47b9dea7c380",
+      "status": "test",
+      "purpose": "triage",
+      "version": "1",
+      "seconds": 0.0021,
       "known_fp": [],
       "last_fp": null,
       "fp_total": 0
