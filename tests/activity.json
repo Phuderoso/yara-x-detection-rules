@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "_doc": "Último match verdadeiro por regra fora das fixtures (hunting real, amostra do samples.lock, IR). Escrito por `scripts/hunt.py --record-activity` ou à mão: {\"<regra>\": {\"last_match\": \"YYYY-MM-DD\", \"source\": \"hunt|samples|ir|manual\"}}. docs/health.md usa isto para apontar regras com FP e sem match há X semanas (candidatas a deprecated). Vazio = nenhuma regra provou utilidade fora das fixtures ainda, e o painel diz isso.",
+  "rules": {}
+}

@@ -1,0 +1,28 @@
+# Corpus limpo reprodutível para o vigia de FP (.github/workflows/fp-watch.yml).
+# Wheels do PyPI fixadas por versão E por sha256; `scripts/fp_watch.py corpus` baixa com
+# `pip download --require-hashes --only-binary=:all: --platform manylinux2014_x86_64
+#  --python-version 3.12 --implementation cp --abi cp312` e descompacta em build/fp-corpus/pip/.
+# Um hash diferente = arquivo diferente = o download falha, em vez de escanear algo que não
+# é o que a baseline viu. Nada daqui é instalado nem executado.
+#
+# Escolha: extensões nativas (.so grandes, tabelas, código gerado) e um pacote puro. É o tipo
+# de goodware que mais acende regra de hex frouxa.
+
+cffi==1.17.1 \
+    --hash=sha256:b62ce867176a75d03a665bad002af8e6d54644fad99a3c70905c543130e39d93
+charset_normalizer==3.4.0 \
+    --hash=sha256:8cda06946eac330cbe6598f77bb54e690b4ca93f593dee1568ad22b04f347c15
+cryptography==44.0.0 \
+    --hash=sha256:404fdc66ee5f83a1388be54300ae978b2efd538018de18556dde92575e05defc
+markupsafe==3.0.2 \
+    --hash=sha256:e17c96c14e19278594aa4841ec148115f9c7615a47382ecb6b82bd8fea3ab0c8
+msgpack==1.1.0 \
+    --hash=sha256:17fb65dd0bec285907f68b15734a993ad3fc94332b5bb21b0435846228de1f39
+psutil==6.1.0 \
+    --hash=sha256:498c6979f9c6637ebc3a73b3f87f9eb1ec24e1ce53a7c5173b8508981614a90b
+pyyaml==6.0.2 \
+    --hash=sha256:80bab7bfc629882493af4aa31a4cfa43a4c57c83813253626916b8c7ada83476
+regex==2024.11.6 \
+    --hash=sha256:70b7fa6606c2881c1db9479b0eaa11ed5dfa11c8d60a474ff0e095099f39d98e
+requests==2.32.3 \
+    --hash=sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6

@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "generated": "2026-11-09",
+  "filter": {
+    "status": [
+      "stable",
+      "test"
+    ]
+  },
+  "corpus": {
+    "paths": [
+      "/usr/bin",
+      "/usr/sbin",
+      "/usr/lib/x86_64-linux-gnu",
+      "/usr/libexec",
+      "build/fp-corpus/pip"
+    ],
+    "files": 3350,
+    "manifest_sha256": "1ea8fc44c2ec6530717758d9831a92175a9f5915ab1edcfe5ad5fc6386ee45b5",
+    "platform": "Linux-6.12.113+-x86_64-with-glibc2.39"
+  },
+  "rules": {
+    "MAL_Win_Loader_FamilyX_ConfigMarker": {
+      "id": "f2522e58-c8f9-4ced-aea3-97419582c3f4",
+      "status": "test",
+      "purpose": "triage",
+      "version": "2",
+      "seconds": 0.1256,
+      "known_fp": [],
+      "last_fp": null,
+      "fp_total": 0
+    }
+  }
+}
