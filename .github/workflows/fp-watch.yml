@@ -1,0 +1,99 @@
+name: fp-watch
+
+# Vigia de falso positivo. Toda semana (e na mão) monta um corpus limpo reprodutível no
+# runner, escaneia com as regras stable/test, compara com tests/goodware/baseline.json e,
+# se houver FP novo ou estouro de orçamento, abre OU atualiza UMA issue `fp-regression`.
+# Sem segredos além do GITHUB_TOKEN; permissões mínimas.
+
+on:
+  schedule:
+    # quarta 06:23 UTC — longe do rules-ci de segunda, para separar "runner mudou" de "regra mudou"
+    - cron: "23 6 * * 3"
+  workflow_dispatch:
+    inputs:
+      open_issue:
+        description: "Abrir/atualizar a issue fp-regression se houver regressão"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: fp-watch
+  cancel-in-progress: false
+
+env:
+  # Goodware do runner: binários e bibliotecas do ubuntu-latest. Reprodutível por imagem;
+  # o drift da imagem aparece no manifesto, não como FP misterioso.
+  RUNNER_CORPUS: /usr/bin /usr/sbin /usr/lib/x86_64-linux-gnu /usr/libexec
+  FP_WATCH_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  fp-watch:
+    name: goodware semanal vs baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Nenhum binário/sample commitado
+        run: python scripts/check_no_binaries.py
+
+      - name: Lint (regras precisam compilar antes de medir)
+        run: python scripts/lint_rules.py --no-format
+
+      - name: Corpus pip fixado por hash (download + unzip; nada instalado)
+        id: corpus
+        run: python scripts/fp_watch.py corpus --out build/fp-corpus
+
+      - name: Manifesto do corpus (sha256 por arquivo)
+        run: |
+          python scripts/corpus_manifest.py build $RUNNER_CORPUS build/fp-corpus/pip -o build/manifest.json
+          if [ -f tests/goodware/manifests/linux.json ]; then
+            python scripts/corpus_manifest.py diff tests/goodware/manifests/linux.json build/manifest.json --markdown >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+
+      - name: Scan goodware (regras stable e test) + tempo por regra
+        run: |
+          python scripts/scan_goodware.py $RUNNER_CORPUS build/fp-corpus/pip --status stable,test --triage-warn --quiet || true
+          python scripts/report.py --status stable,test --no-fixtures \
+            --corpus $RUNNER_CORPUS build/fp-corpus/pip --out build/report.json --label fp-watch
+
+      - name: Comparar com tests/goodware/baseline.json
+        id: compare
+        run: |
+          python scripts/fp_watch.py compare --report build/report.json --manifest build/manifest.json \
+            --out build/diff.json --markdown build/diff.md
+          cat build/diff.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Issue única fp-regression (abre, atualiza ou fecha)
+        if: ${{ github.event_name == 'schedule' || inputs.open_issue }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/fp_watch.py issue --diff build/diff.json --markdown build/diff.md --repo "$GITHUB_REPOSITORY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fp-watch-${{ github.run_id }}
+          path: |
+            build/report.json
+            build/manifest.json
+            build/diff.json
+            build/diff.md
+          retention-days: 90
+
+      - name: Falhar o job se houve regressão
+        if: steps.compare.outputs.regression == 'true'
+        run: |
+          echo "::error::FP novo ou orçamento estourado; veja a issue fp-regression e o artifact"
+          exit 1
