@@ -2,9 +2,9 @@
 
 <!-- gerado por scripts/health.py; não edite à mão -->
 
-2 regra(s). Referência: 2026-11-09. Regenerar: `make health`. FP vem de `tests/goodware/baseline.json` (fp-watch semanal); match verdadeiro vem de `tests/activity.json` (`hunt.py --record-activity`). Idades em faixas: o arquivo só muda ao cruzar uma.
+5 regra(s). Referência: 2026-11-09. Regenerar: `make health`. FP vem de `tests/goodware/baseline.json` (fp-watch semanal); match verdadeiro vem de `tests/activity.json` (`hunt.py --record-activity`). Idades em faixas: o arquivo só muda ao cruzar uma.
 
-Baseline de FP: 2026-11-09; 1 regra(s) sob vigia (stable/test); 0 FP conhecido(s) aceito(s).
+Baseline de FP: 2026-11-09; 4 regra(s) sob vigia (stable/test); 0 FP conhecido(s) aceito(s).
 
 ## Por regra
 
@@ -12,6 +12,9 @@ Baseline de FP: 2026-11-09; 1 regra(s) sob vigia (stable/test); 0 FP conhecido(s
 |---|---|---|---|---|---|---:|---:|---|---|---|
 | [`MAL_Win_Loader_FamilyX_ConfigMarker`](../rules/windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar) | test | triage | file | 30–90 d | < 30 d | 0 | 0 | nunca | nunca | - |
 | [`MAL_Win_Loader_FamilyX_InMemory`](../rules/memory/MAL_Win_Loader_FamilyX_InMemory.yar) | experimental | hunting | memory | < 30 d | < 30 d | 0 | 0 | nunca | nunca | - |
+| [`MAL_Win_Ransomware_WannaCry_Strings`](../rules/windows/MAL_Win_Ransomware_WannaCry_Strings.yar) | test | triage | file | < 30 d | < 30 d | 0 | 0 | nunca | nunca | - |
+| [`TEST_Multi_EICAR_File`](../rules/multi/TEST_Multi_EICAR_File.yar) | test | triage | file | < 30 d | < 30 d | 0 | 0 | nunca | esta semana | published-target |
+| [`TEST_Multi_EICAR_InZip_Stored`](../rules/multi/TEST_Multi_EICAR_InZip_Stored.yar) | test | triage | file | < 30 d | < 30 d | 0 | 0 | nunca | esta semana | published-target |
 
 ## Candidatas a `deprecated` (FP registrado e sem match há > 12 semanas)
 
@@ -19,9 +22,10 @@ Nenhuma.
 
 ## Sem prova fora das fixtures
 
-Regras `test`/`stable` sem FP e sem match registrado em `tests/activity.json`: limpas, mas ainda não mostraram serviço. Rode `hunt.py --record-activity` num caso real ou o job `real-samples`.
+Regras `test`/`stable` sem FP e sem match registrado em `tests/activity.json`: limpas, mas ainda não mostraram serviço. Rode `hunt.py --record-activity` ou `memscan.py --record-activity` num caso real, ou o job `real-samples` com uma linha em `tests/samples.lock`.
 
 - [`MAL_Win_Loader_FamilyX_ConfigMarker`](../rules/windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar) (test, triage)
+- [`MAL_Win_Ransomware_WannaCry_Strings`](../rules/windows/MAL_Win_Ransomware_WannaCry_Strings.yar) (test, triage)
 
 ## Sinais
 

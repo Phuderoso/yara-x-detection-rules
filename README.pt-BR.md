@@ -90,8 +90,11 @@ Para desenvolver tooling: `make setup-dev` (ruff, mypy, pytest, bandit, yara-pyt
 ```text
 rules/                        regras, uma por arquivo
   _TEMPLATE.yar               ponto de partida (prefixo "_" = ignorado pela CI)
-  windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar   scope = file (MZ, filesize, pe.*)
+  windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar   scope = file (MZ, filesize, pe.*); família fictícia
+  windows/MAL_Win_Ransomware_WannaCry_Strings.yar   família pública, strings e hashes de relatórios citados
   memory/MAL_Win_Loader_FamilyX_InMemory.yar        scope = memory (decoder ou config decifrada)
+  multi/TEST_Multi_EICAR_File.yar                   o arquivo de teste EICAR publicado (alvo real, benigno)
+  multi/TEST_Multi_EICAR_InZip_Stored.yar           EICAR dentro de zip armazenado (deflate = limite documentado)
 rules-ci.toml                 limites: strings mínimas, orçamento de tempo, tamanho máximo no corpus
 scripts/
   yrlib.py                    compilador com policies, parse de meta, config, helpers
@@ -114,11 +117,13 @@ scripts/
 tools/anchors/                extrator de âncoras: capstone, superset disassembly, wildcard por operando
 tests/
   fakepe.py                   gera PE64 sintéticos válidos para o módulo `pe`
-  cases.py                    fixtures positivas e negativas por regra (PE e regiões de memória)
+  eicar.py                    monta o EICAR (e o zip) em memória a partir de hex; o literal nunca vai a disco
+  cases.py                    fixtures positivas e negativas por regra (PE, memória, EICAR, WannaCry)
+  test_eicar.py               sha256 da fixture == hash publicado; nenhum arquivo versionado tem o literal
   test_anchors.py             aceitação do extrator: acha o $decode da FamilyX sozinho
   test_memscan.py             dump sintético, chunks sobrepostos, ECS, parse da saída do vol3
   samples.lock                sha256 + família + fonte de amostras reais (sem binário)
-  activity.json               último match verdadeiro por regra (hunt.py --record-activity); alimenta docs/health.md
+  activity.json               último match verdadeiro por regra (hunt.py / memscan.py --record-activity); alimenta docs/health.md
   test_lint.py, test_tooling.py, test_fp_watch.py, test_health.py   pytest do tooling
   goodware/                   corpus limpo local (ignorado pelo git) + manifests/, baseline.json, pip-corpus.txt
 journal/                      diário da construção, estilo case-files, um arquivo por dia
@@ -132,6 +137,26 @@ docs/health.md                painel gerado (status, idade, FP, último match, c
 
 Nenhum binário é versionado: fixtures são geradas em memória por `fakepe.py`; goodware e
 samples ficam fora do repo (ou só como hash em `samples.lock` e nos manifests).
+
+## Alvos reais sem malware
+
+- **EICAR** (`TEST_Multi_EICAR_File`, `TEST_Multi_EICAR_InZip_Stored`). O
+  [arquivo de teste da EICAR](https://www.eicar.org/download-anti-malware-testfile/) é uma string
+  publicada de 68 bytes que todo antivírus detecta por convenção; inofensiva, e o único alvo de
+  detecção que cabe num repo sem malware. A fixture *é* o alvo: `tests/eicar.py` monta o arquivo a
+  partir de hex na hora do teste e `tests/test_eicar.py` confere o sha256 contra o publicado. O
+  literal nunca é escrito, nem em comentário: qualquer arquivo versionado que o contivesse
+  dispararia antivírus no checkout do runner Windows (um teste varre a árvore procurando). Regras e
+  fixtures usam hex por isso; o lint aceita `// allow-hex-as-text` exatamente nessa linha. A regra
+  de zip só enxerga membros **armazenados**: o YARA-X não inflaciona, então zip deflatado é
+  fixture negativa e limite documentado, não escondido. O prefixo `TEST_` existe para isto: não é
+  malware, não é hipótese.
+- **WannaCry** (`MAL_Win_Ransomware_WannaCry_Strings`). Uma família pública e exaustivamente
+  documentada. Cada string (domínio kill switch, senha do zip embutido, nomes de componentes) e os
+  dois hashes vêm dos relatórios citados no `meta` da regra (Kaspersky Securelist, Microsoft, Cisco
+  Talos, MalwareTech, CISA TA17-132A). A condição exige PE abaixo de 8 MB e uma âncora única ou
+  dois nomes de componente, então listas de IOC e relatórios não acendem. `tests/samples.lock` leva
+  os dois sha256 públicos para o job manual `real-samples`; nada é commitado.
 
 ## Contrato de uma regra
 
@@ -228,7 +253,8 @@ bytes brutos em chunks sobrepostos (procdump, VAD dump, `windows.memmap --dump`)
 `vol3` chama o Volatility 3 (`yarascan`/`vadyarascan`, que já usa YARA-X) para imagens com OS
 detectado e traz PID/processo; `auto` tenta vol3 e cai para raw. Saída JSONL nativa ou ECS
 (`event.category: [malware, process]`, `yara.memory.offset`, `process.pid`). O porquê está na
-seção "Memória" do handbook.
+seção "Memória" do handbook. `memscan.py --record-activity` registra hits de memória em
+`tests/activity.json` (fonte `memscan`), como o `hunt.py` faz para arquivos.
 
 ## Vigia de FP (`fp-watch.yml`)
 
@@ -249,16 +275,28 @@ saiu, a regra foi afrouxada. `fp-watch.yml` roda toda quarta (e por `workflow_di
    marcador dele. Mesmo diff → nenhuma escrita (digest no corpo). Diff diferente → edita o corpo. Run
    limpo → um comentário e fecha. Só o `GITHUB_TOKEN` padrão, com `contents: read` e `issues: write`.
 
-Para aceitar o estado atual como baseline, depois de corrigir ou tolerar conscientemente um FP:
-`make fp-baseline REPORT=build/report.json` (o report está no artifact do run) e commit.
+Aceitar o estado atual como baseline, depois de corrigir ou tolerar conscientemente um FP, é
+decisão humana e commit; o workflow nunca escreve no repositório. Dois caminhos:
+
+- **Do runner (recomendado):** rode o `fp-watch` à mão com `propose_baseline: true`. O job escreve
+  `baseline.proposed.json`, `health.proposed.md` e um `baseline.patch` no artifact e mostra o diff
+  no resumo do run, nada mais. Depois, localmente:
+  `gh run download <run-id> -n fp-watch-<run-id> -D build/artifact && make fp-propose ARTIFACT=build/artifact`.
+  Isso reescreve `tests/goodware/baseline.json` e `docs/health.md` no seu working tree a partir do
+  report e do manifesto do runner; revise o `git diff`, commite, abra o PR.
+- **Local:** `make fp-compare` e depois `make fp-baseline REPORT=build/report.json`. A baseline fica
+  com o hash de corpus da *sua* máquina; o primeiro run no runner marca "corpus mudou" até ser
+  re-baselinada de um artifact.
+
 `baseline.json` guarda também `last_fp` e `fp_total` por regra, que alimentam o painel de saúde.
 
 ## Painel de saúde
 
 `docs/health.md` é gerado por `scripts/health.py`: por regra, status, purpose, scope, idade, tempo
 desde a última mudança, FP conhecidos, FP total histórico, último FP (da baseline) e último match
-verdadeiro (de `tests/activity.json`, escrito por `hunt.py --record-activity` ou à mão depois de um
-IR). Regra com FP registrado e sem match verdadeiro em 12 semanas entra em **candidatas a
+verdadeiro (de `tests/activity.json`, escrito por `hunt.py --record-activity`, `memscan.py
+--record-activity` ou à mão depois de um IR; a fonte `published-target` marca as regras EICAR, cuja
+fixture é o arquivo publicado). Regra com FP registrado e sem match verdadeiro em 12 semanas entra em **candidatas a
 deprecated**; regra `test`/`stable` sem FP nem match entra em "sem prova". Idades em faixas, para o
 arquivo só mudar quando uma regra cruza uma; a CI roda `--check` como faz com o coverage.
 
