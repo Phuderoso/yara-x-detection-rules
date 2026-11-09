@@ -3,7 +3,8 @@ GOODWARE ?= tests/goodware
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-dev)
 
 .PHONY: help setup setup-dev lint fmt fmt-check test goodware report compat bundles changelog \
-        coverage coverage-check anchors memscan quality pytest ci fixtures hunt clean
+        coverage coverage-check health health-check fp-corpus fp-report fp-compare fp-baseline \
+        anchors memscan quality pytest ci fixtures hunt clean
 
 help:
 	@echo "setup       instala dependências de runtime (yara-x)"
@@ -17,6 +18,9 @@ help:
 	@echo "bundles     bundles por purpose + manifest + SHA256SUMS em dist/ (VERSION=$(VERSION))"
 	@echo "changelog   CHANGELOG da versão a partir de commits e diff de rules/"
 	@echo "coverage    regenera docs/coverage.md a partir do meta (coverage-check: só verifica)"
+	@echo "health      regenera docs/health.md (FP, idade, último match, candidatas a deprecated)"
+	@echo "fp-corpus   baixa o corpus pip fixado por hash em build/fp-corpus (fp-report/fp-compare: o resto do vigia)"
+	@echo "fp-baseline aceita REPORT=build/report.json como tests/goodware/baseline.json"
 	@echo "anchors     extrai âncoras de SAMPLES=... (ex.: make anchors SAMPLES='a.exe b.exe' FAMILY=X)"
 	@echo "memscan     escaneia IMAGE=... com as regras de escopo memory/both"
 	@echo "quality     ruff + mypy + pytest + bandit"
@@ -66,6 +70,29 @@ coverage:
 coverage-check:
 	$(PYTHON) scripts/coverage.py --check
 
+health:
+	$(PYTHON) scripts/health.py
+
+health-check:
+	$(PYTHON) scripts/health.py --check
+
+FP_CORPUS ?= /usr/bin /usr/lib/x86_64-linux-gnu
+REPORT ?= build/report.json
+
+fp-corpus:
+	$(PYTHON) scripts/fp_watch.py corpus --out build/fp-corpus
+
+fp-report: fp-corpus
+	$(PYTHON) scripts/corpus_manifest.py build $(FP_CORPUS) build/fp-corpus/pip -o build/manifest.json
+	$(PYTHON) scripts/report.py --status stable,test --no-fixtures --corpus $(FP_CORPUS) build/fp-corpus/pip --out $(REPORT) --label local
+
+fp-compare: fp-report
+	$(PYTHON) scripts/fp_watch.py compare --report $(REPORT) --manifest build/manifest.json --out build/diff.json --markdown build/diff.md --fail
+
+fp-baseline:
+	$(PYTHON) scripts/fp_watch.py baseline --report $(REPORT) $(if $(wildcard build/manifest.json),--manifest build/manifest.json,)
+	$(PYTHON) scripts/health.py
+
 anchors:
 	@test -n "$(SAMPLES)" || { echo "use: make anchors SAMPLES='a.exe b.exe' FAMILY=FamilyX [GOODWARE=dir]"; exit 1; }
 	$(PYTHON) tools/anchors/extract_anchors.py $(SAMPLES) --family "$(FAMILY)" $(if $(wildcard $(GOODWARE)),--goodware "$(GOODWARE)",) \
@@ -85,7 +112,7 @@ quality:
 	$(PYTHON) -m pytest -q
 	bandit -q -r scripts tests -c pyproject.toml
 
-ci: lint test coverage-check goodware quality
+ci: lint test coverage-check health-check goodware quality
 
 fixtures:
 	$(PYTHON) scripts/test_rules.py --dump build/fixtures

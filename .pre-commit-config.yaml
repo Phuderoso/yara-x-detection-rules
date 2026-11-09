@@ -47,3 +47,10 @@ repos:
         additional_dependencies: ["yara-x>=1.23,<2"]
         files: ^(rules/.*\.yara?|scripts/(coverage|yrlib)\.py)$
         pass_filenames: false
+      - id: health
+        name: docs/health.md gerado do meta + baseline + activity
+        entry: python scripts/health.py
+        language: python
+        additional_dependencies: ["yara-x>=1.23,<2"]
+        files: ^(rules/.*\.yara?|tests/(goodware/baseline|activity)\.json|scripts/(health|yrlib)\.py)$
+        pass_filenames: false
