@@ -3,6 +3,7 @@
 //
 // Convenção de nome: <PREFIXO>_<Plataforma>_<Tipo>_<Família>_<Traço>
 //   PREFIXO: MAL (família conhecida) | HUNT (hipótese, larga) | SUSP (suspeito, genérico)
+//            TEST (alvo de teste publicado e benigno, ex.: EICAR)
 // Meta obrigatório (scripts/lint_rules.py): id, version, author, date, modified,
 //   description, hash, status, purpose, mitre_attack, scope.
 // Ciclo de vida: experimental → test → stable → deprecated.
