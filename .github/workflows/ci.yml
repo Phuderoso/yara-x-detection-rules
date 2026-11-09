@@ -1,0 +1,221 @@
+name: rules-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Semanal: a imagem do runner muda e um produto novo pode começar a dar FP
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      real_samples:
+        description: "Baixar e escanear tests/samples.lock do MalwareBazaar (exige secret MALWAREBAZAAR_API_KEY)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  LINUX_CORPUS: /usr/bin /usr/sbin /usr/lib/x86_64-linux-gnu /usr/libexec
+
+jobs:
+  code-quality:
+    name: código (ruff, mypy, pytest, bandit, pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+      - run: pytest -q
+      - name: Bandit (SAST nos scripts)
+        run: bandit -q -r scripts tests -c pyproject.toml
+      - name: pip-audit (dependências diretas e transitivas)
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements.txt requirements-dev.txt
+
+  rules:
+    name: regras (lint, fixtures, goodware ELF, diff vs base, orçamento)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Nenhum binário/sample commitado
+        run: python scripts/check_no_binaries.py
+
+      - name: Lint (compile, meta, ciclo de vida, unicidade, strings, formatação)
+        run: python scripts/lint_rules.py
+
+      - name: Fixtures sintéticas (positivos + negativos)
+        run: python scripts/test_rules.py --strict -v
+
+      - name: Painel de cobertura (docs/coverage.md) em dia
+        run: python scripts/coverage.py --check
+
+      - name: Gate de FP em goodware ELF do runner
+        run: python scripts/scan_goodware.py $LINUX_CORPUS --quiet --jsonl goodware-hits-linux.jsonl
+
+      - name: Relatório do head (hits, tempo por regra, fixtures)
+        run: python scripts/report.py --corpus $LINUX_CORPUS --out reports/head.json --label head
+
+      - name: Checkout do branch base (só rules/)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+          sparse-checkout: rules
+      - name: Relatório do base (mesmos scripts, regras do base)
+        if: github.event_name == 'pull_request'
+        run: python scripts/report.py --rules base/rules --corpus $LINUX_CORPUS --no-fixtures --out reports/base.json --label base
+
+      - name: Diff base vs head + orçamento de performance
+        id: diff
+        run: |
+          if [ -f reports/base.json ]; then
+            python scripts/diff_report.py --head reports/head.json --base reports/base.json --out reports/diff.md --fail-on-new-hits
+          else
+            python scripts/diff_report.py --head reports/head.json --out reports/diff.md
+          fi
+
+      - name: Comentar o diff no PR
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('reports/diff.md')) return;
+            const marker = '<!-- yara-rules-ci-diff -->';
+            const body = marker + '\n' + fs.readFileSync('reports/diff.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const mine = comments.find(c => c.user.type === 'Bot' && c.body && c.body.startsWith(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Manifesto do corpus (drift vs manifesto fixado)
+        if: always()
+        run: |
+          python scripts/corpus_manifest.py build $LINUX_CORPUS -o reports/manifest-ubuntu-latest.json
+          if [ -f tests/goodware/manifests/ubuntu-latest.json ]; then
+            python scripts/corpus_manifest.py diff tests/goodware/manifests/ubuntu-latest.json reports/manifest-ubuntu-latest.json --markdown
+          else
+            echo "::notice::sem manifesto fixado em tests/goodware/manifests/ubuntu-latest.json; baixe o artifact 'reports-linux' e commite-o para fixar o corpus"
+          fi
+
+      - name: Matriz de compatibilidade YARA 4.x
+        if: always()
+        run: |
+          pip install yara-python
+          python scripts/compat_yara4.py --json reports/compat-yara4.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-linux
+          path: |
+            reports/
+            goodware-hits-linux.jsonl
+          if-no-files-found: ignore
+
+  goodware-windows:
+    name: gate de FP em goodware PE (windows)
+    runs-on: windows-latest
+    needs: rules
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: System32 / SysWOW64 / toolchains comuns
+        shell: pwsh
+        run: |
+          $paths = @(
+            "C:\Windows\System32",
+            "C:\Windows\SysWOW64",
+            "C:\Program Files\Git",
+            "C:\Program Files\nodejs",
+            "C:\Program Files\PowerShell",
+            "C:\Program Files\7-Zip"
+          ) | Where-Object { Test-Path $_ }
+          "CORPUS=$($paths -join '|')" | Out-File -FilePath $env:GITHUB_ENV -Append
+          python scripts/scan_goodware.py @paths --quiet --jsonl goodware-hits-windows.jsonl
+      - name: Relatório + tempo por regra no corpus PE
+        if: always()
+        shell: pwsh
+        run: |
+          $paths = $env:CORPUS -split '\|'
+          python scripts/report.py --corpus @paths --no-fixtures --out reports/head-windows.json --label head-windows
+          python scripts/diff_report.py --head reports/head-windows.json --out reports/diff-windows.md
+      - name: Manifesto do corpus PE (drift vs manifesto fixado)
+        if: always()
+        shell: pwsh
+        run: |
+          $paths = $env:CORPUS -split '\|'
+          python scripts/corpus_manifest.py build @paths -o reports/manifest-windows-latest.json
+          if (Test-Path tests/goodware/manifests/windows-latest.json) {
+            python scripts/corpus_manifest.py diff tests/goodware/manifests/windows-latest.json reports/manifest-windows-latest.json --markdown
+          } else {
+            Write-Output "::notice::sem manifesto fixado em tests/goodware/manifests/windows-latest.json; baixe o artifact 'reports-windows' e commite-o para fixar o corpus"
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-windows
+          path: |
+            reports/
+            goodware-hits-windows.jsonl
+          if-no-files-found: ignore
+
+  real-samples:
+    name: positivos reais (MalwareBazaar, manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.real_samples
+    runs-on: ubuntu-latest
+    needs: rules
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt pyzipper
+      - name: Verificar secret
+        id: key
+        env:
+          KEY: ${{ secrets.MALWAREBAZAAR_API_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::warning::MALWAREBAZAAR_API_KEY não configurado; job pulado"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Baixar, escanear e apagar (nunca executa; sem artifact)
+        if: steps.key.outputs.present == 'true'
+        env:
+          MALWAREBAZAAR_API_KEY: ${{ secrets.MALWAREBAZAAR_API_KEY }}
+        run: python scripts/fetch_samples.py --strict

@@ -1,0 +1,8 @@
+# Revisão obrigatória por área. Ajuste os handles para o time real.
+*                       @Phuderoso
+/rules/                 @Phuderoso
+/scripts/               @Phuderoso
+/tests/cases.py         @Phuderoso
+/.github/workflows/     @Phuderoso
+/rules-ci.toml          @Phuderoso
+/tests/samples.lock     @Phuderoso
