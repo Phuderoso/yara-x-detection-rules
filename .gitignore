@@ -3,6 +3,8 @@
 tests/goodware/*
 !tests/goodware/README.md
 !tests/goodware/manifests/
+!tests/goodware/baseline.json
+!tests/goodware/pip-corpus.txt
 samples/
 *.jsonl
 *.ndjson

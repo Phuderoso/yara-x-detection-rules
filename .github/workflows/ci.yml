@@ -65,8 +65,10 @@ jobs:
       - name: Fixtures sintéticas (positivos + negativos)
         run: python scripts/test_rules.py --strict -v
 
-      - name: Painel de cobertura (docs/coverage.md) em dia
-        run: python scripts/coverage.py --check
+      - name: Painéis gerados (docs/coverage.md, docs/health.md) em dia
+        run: |
+          python scripts/coverage.py --check
+          python scripts/health.py --check
 
       - name: Gate de FP em goodware ELF do runner
         run: python scripts/scan_goodware.py $LINUX_CORPUS --quiet --jsonl goodware-hits-linux.jsonl
@@ -101,7 +103,7 @@ jobs:
           script: |
             const fs = require('fs');
             if (!fs.existsSync('reports/diff.md')) return;
-            const marker = '<!-- yara-rules-ci-diff -->';
+            const marker = '<!-- yara-x-detection-rules-ci-diff -->';
             const body = marker + '\n' + fs.readFileSync('reports/diff.md', 'utf8');
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
