@@ -1,0 +1,21 @@
+# Positivos reais, SEM commitar malware.
+#
+# Cada linha fixa uma amostra por sha256. scripts/fetch_samples.py baixa do
+# MalwareBazaar (abuse.ch) para um diretório temporário, extrai o zip
+# (senha "infected"), ESCANEIA com as regras do repo, confere que a(s) regra(s)
+# esperada(s) casou/casaram e apaga tudo. Nada é executado, nada vira artifact.
+#
+# Formato (TSV, colunas separadas por TAB):
+#   sha256	family	source	expect_rules	note
+#   - family       : nome da família como você a chama (bate com meta.malware)
+#   - source       : de onde veio o hash (malwarebazaar | vt | ir-case-id)
+#   - expect_rules : regras que DEVEM casar, separadas por vírgula; "-" = só escanear/observar
+#   - note         : livre
+#
+# Para adicionar uma linha, use um hash que você mesmo validou (ex.: a semente
+# em meta.hash). Não copie hashes de relatórios sem confirmar no MalwareBazaar.
+#
+# A FamilyX deste repo é fictícia, então não há amostra pública dela. Exemplo de
+# linha (comentado) com o formato:
+#
+# 0000000000000000000000000000000000000000000000000000000000000000	FamilyX	malwarebazaar	MAL_Win_Loader_FamilyX_ConfigMarker	semente, build 2026-09
