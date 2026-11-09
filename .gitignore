@@ -1,0 +1,21 @@
+# Corpus local: goodware e samples nunca entram no repo.
+# Só o README e os manifestos (sha256 por arquivo) são versionados.
+tests/goodware/*
+!tests/goodware/README.md
+!tests/goodware/manifests/
+samples/
+*.jsonl
+*.ndjson
+
+# Saídas geradas
+build/
+dist/
+reports/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

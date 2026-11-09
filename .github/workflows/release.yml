@@ -1,0 +1,80 @@
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+
+permissions:
+  contents: write   # criar a release e anexar artefatos
+  id-token: write   # OIDC para assinatura keyless (Sigstore)
+
+jobs:
+  build-sign-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # changelog precisa das tags anteriores
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Gate de qualidade (mesmo da CI)
+        run: |
+          python scripts/lint_rules.py
+          python scripts/test_rules.py --strict
+
+      - name: Bundles por purpose + manifest + SHA256SUMS
+        run: python scripts/build_bundles.py --version "${GITHUB_REF_NAME}" --out dist/
+
+      - name: Matriz de compatibilidade YARA 4.x
+        run: |
+          pip install yara-python
+          python scripts/compat_yara4.py --json dist/compat-yara4.json
+
+      - name: CHANGELOG a partir dos commits e do diff de rules/
+        run: python scripts/changelog.py --version "${GITHUB_REF_NAME}" --out dist/CHANGELOG.md
+
+      - name: Recalcular SHA256SUMS com todos os artefatos
+        working-directory: dist
+        run: |
+          rm -f SHA256SUMS
+          sha256sum * | sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Instalar cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Assinar artefatos (Sigstore keyless, OIDC do GitHub Actions)
+        working-directory: dist
+        run: |
+          for f in *.yar *.yarc manifest.json SHA256SUMS; do
+            cosign sign-blob --yes --bundle "${f}.sigstore.json" "$f"
+          done
+
+      - name: Verificar assinaturas antes de publicar
+        working-directory: dist
+        run: |
+          for f in *.yar *.yarc manifest.json SHA256SUMS; do
+            cosign verify-blob \
+              --bundle "${f}.sigstore.json" \
+              --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/\.github/workflows/release\.yml@refs/tags/" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$f"
+          done
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: dist/CHANGELOG.md
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/*.yar
+            dist/*.yarc
+            dist/manifest.json
+            dist/compat-yara4.json
+            dist/CHANGELOG.md
+            dist/SHA256SUMS
+            dist/*.sigstore.json

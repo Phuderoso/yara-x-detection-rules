@@ -1,0 +1,49 @@
+# pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=256"]   # binário grande no repo é sinal de sample commitado
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: yr-fmt
+        name: yr fmt (formatter do YARA-X)
+        entry: python scripts/fmt_rules.py
+        language: python
+        additional_dependencies: ["yara-x>=1.23,<2"]
+        files: ^rules/.*\.yara?$
+        pass_filenames: false
+      - id: yara-lint
+        name: lint das regras
+        entry: python scripts/lint_rules.py
+        language: python
+        additional_dependencies: ["yara-x>=1.23,<2"]
+        files: ^(rules/.*\.yara?|rules-ci\.toml|scripts/(lint_rules|yrlib)\.py)$
+        pass_filenames: false
+      - id: no-binaries
+        name: nenhum binário/sample em rules/ ou tests/
+        entry: python scripts/check_no_binaries.py
+        language: python
+        files: ^(rules|tests)/
+        pass_filenames: false
+      - id: coverage
+        name: docs/coverage.md gerado do meta
+        entry: python scripts/coverage.py
+        language: python
+        additional_dependencies: ["yara-x>=1.23,<2"]
+        files: ^(rules/.*\.yara?|scripts/(coverage|yrlib)\.py)$
+        pass_filenames: false
