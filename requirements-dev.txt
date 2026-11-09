@@ -1,0 +1,10 @@
+ruff>=0.17,<1
+mypy>=2.4,<3
+pytest>=9,<10
+bandit[toml]>=1.9,<2
+pip-audit>=2.10,<3
+pre-commit>=4,<5
+# tools/anchors e scripts/memscan.py
+capstone>=5.0,<6
+pefile>=2024.8,<2025
+volatility3>=2.26,<3

@@ -1,0 +1,57 @@
+[project]
+name = "yara-rules"
+version = "0.0.0"
+description = "YARA-X detection-engineering repo: rules that survive clean corpora, new family builds, and noisy hunting pipelines. CC0."
+license = { text = "CC0-1.0" }
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["scripts", "tests", "tools/anchors"]
+extend-exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "PL", "RUF"]
+ignore = [
+  "PLR0912", "PLR0913", "PLR0915", "PLR2004", # CLIs têm muitos branches/args; magic numbers em PE são o formato
+  "S603", "S607",                              # subprocess com git, argumentos fixos
+  "E501",                                      # ruff format cuida da largura
+  "RUF001", "RUF002", "RUF003",                # texto em português com acentos/travessões
+  "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLC0415"]
+"scripts/**" = ["PLC0415"]
+"tools/**" = ["PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["yrlib", "fakepe", "cases", "extract_anchors"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["scripts", "tests", "tools"]
+mypy_path = "scripts:tests:tools/anchors"
+strict = true
+warn_unused_ignores = false
+ignore_missing_imports = true
+allow_untyped_calls = true
+disallow_any_generics = false
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["yara_x", "yara", "pyzipper", "capstone", "capstone.*", "pefile", "volatility3", "volatility3.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts", "tests", "tools/anchors"]
+addopts = "-ra"
+
+[tool.bandit]
+exclude_dirs = ["build", "dist", ".venv"]
+skips = ["B101", "B404"]  # B101: assert em testes/invariantes; B404: import subprocess (só git, args fixos)

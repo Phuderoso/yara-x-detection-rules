@@ -1,0 +1,17 @@
+# Configuração da CI de regras. Lida por scripts/yrlib.py (tomllib).
+
+[lint]
+min_text_string_bytes = 6
+min_fixed_hex_bytes = 6
+
+[performance]
+# Tempo máximo (segundos) de UMA regra escaneando o corpus inteiro.
+max_rule_seconds = 20.0
+# Regressão máxima (%) de uma regra em relação ao branch base.
+max_regression_pct = 50.0
+# Abaixo deste tempo absoluto (s) a regressão percentual é ignorada: ruído do runner.
+regression_floor_seconds = 1.0
+
+[goodware]
+max_file_size = "32MB"
+scan_timeout_seconds = 30
