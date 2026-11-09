@@ -150,9 +150,20 @@ def test_hunt_ecs_mapping() -> None:
     assert ecs["@timestamp"].endswith("Z")
 
 
-def test_samples_lock_parses_and_has_no_active_entries() -> None:
+def test_samples_lock_entries_are_public_families_with_existing_rules() -> None:
     samples = fetch_samples.parse_lock(yrlib.REPO_ROOT / "tests" / "samples.lock")
-    assert samples == [], "o lock do repo não deve apontar para amostras reais da FamilyX fictícia"
+    infos = {i.name: i for f in yrlib.rule_files() for i in yrlib.parse_rule_infos(f)}
+    families = {i.family for i in infos.values() if i.family}
+    assert samples, "o lock deve ter ao menos uma família pública (WannaCry) para o job real-samples"
+    for s in samples:
+        assert s.family != "FamilyX", "a FamilyX é fictícia: não pode ter amostra real"
+        assert s.family in families, f"{s.family} não bate com nenhum meta.malware"
+        assert s.source and s.expect_rules, "cada linha cita a fonte e a(s) regra(s) que devem casar"
+        for r in s.expect_rules:
+            assert r in infos, f"{r} não existe em rules/"
+            assert infos[r].family == s.family
+        # o hash da linha é também o hash citado em meta.hash da regra: uma fonte só
+        assert any(s.sha256 in (infos[r].meta.get("hash") or "") for r in s.expect_rules)
 
 
 def test_samples_lock_parse_format(tmp_path: Path) -> None:
@@ -218,3 +229,16 @@ def test_coverage_check_fails_when_stale(tmp_path: Path) -> None:
     # regra nova muda o painel -> check falha
     (rules_dir / "b.yar").write_text(make_rule(purpose="hunting").replace("Good_Anchor", "New"))
     assert cov.main(["--rules", str(rules_dir), "--out", str(out), "--check", "--as-of", "2026-06-01"]) == 1
+
+
+def test_hunt_record_activity_to_custom_path(tmp_path: Path) -> None:
+    from cases import INJECT_APIS
+    from fakepe import build_pe, cstrings
+
+    sample = tmp_path / "s.bin"
+    sample.write_bytes(build_pe(rdata=cstrings("CONFIG_START::mutex_id::", *INJECT_APIS), seed=11))
+    activity = tmp_path / "activity.json"
+    assert hunt.main([str(sample), "--record-activity", "--activity", str(activity)]) == 0
+    data = yrlib.load_activity(activity)
+    assert data["rules"]["MAL_Win_Loader_FamilyX_ConfigMarker"]["source"] == "hunt"
+    assert yrlib.load_activity()["rules"].get("MAL_Win_Loader_FamilyX_ConfigMarker") is None

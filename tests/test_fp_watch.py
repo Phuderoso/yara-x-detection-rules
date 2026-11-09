@@ -369,3 +369,58 @@ def test_zip_slip_is_rejected(tmp_path: Path) -> None:
         zf.writestr("../../escape.txt", "x")
     with pytest.raises(ValueError, match="caminho suspeito"):
         fp_watch.build_pip_corpus(tmp_path / "none.txt", tmp_path, pip=["true"])
+
+
+# ---------------------------------------------------------------- re-baseline do runner (artifact)
+
+
+def _artifact_dir(tmp_path: Path, hits: list[dict[str, Any]]) -> Path:
+    art = tmp_path / "fp-watch-123"
+    art.mkdir()
+    (art / "report.json").write_text(json.dumps(report(hits)))
+    (art / "manifest.json").write_text(json.dumps({"files": {"/usr/bin/x": {"sha256": "1" * 64, "size": 1}}}))
+    (art / "diff.md").write_text("ignored")
+    return art
+
+
+def test_baseline_from_artifact_directory_proposes_without_committing(tmp_path: Path) -> None:
+    art = _artifact_dir(tmp_path, [{"file": "/usr/bin/x", "sha256": SHA_A}])
+    out = tmp_path / "baseline.json"
+    assert fp_watch.main(["baseline", "--from-artifact", str(art), "--out", str(out), "--today", "2026-11-09"]) == 0
+    b = json.loads(out.read_text())
+    assert [fp["sha256"] for fp in b["rules"]["MAL_Win_Test_Rule"]["known_fp"]] == [SHA_A]
+    assert b["corpus"]["manifest_sha256"] == fp_watch._manifest_sha(art / "manifest.json")
+    # nada do repo mudou
+    assert fp_watch.load_baseline()["generated"] != "1970-01-01"
+
+
+def test_baseline_from_artifact_zip(tmp_path: Path) -> None:
+    import zipfile
+
+    art = _artifact_dir(tmp_path, [])
+    zpath = tmp_path / "fp-watch-123.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        for f in art.iterdir():
+            zf.write(f, f.name)
+    out = tmp_path / "baseline.json"
+    assert fp_watch.main(["baseline", "--from-artifact", str(zpath), "--out", str(out), "--today", "2026-11-09"]) == 0
+    assert json.loads(out.read_text())["rules"]["MAL_Win_Test_Rule"]["known_fp"] == []
+
+
+def test_baseline_from_artifact_rejects_zip_slip_and_missing_report(tmp_path: Path) -> None:
+    import zipfile
+
+    bad = tmp_path / "bad.zip"
+    with zipfile.ZipFile(bad, "w") as zf:
+        zf.writestr("../escape.json", "{}")
+    with pytest.raises(ValueError, match="caminho suspeito"):
+        fp_watch.artifact_files(bad, tmp_path / "w")
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(FileNotFoundError):
+        fp_watch.artifact_files(empty, tmp_path / "w2")
+
+
+def test_baseline_requires_exactly_one_source(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        fp_watch.main(["baseline", "--out", str(tmp_path / "b.json")])

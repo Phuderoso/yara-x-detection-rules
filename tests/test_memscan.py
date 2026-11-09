@@ -160,3 +160,31 @@ def test_subset_source_keeps_imports_and_private_rules(tmp_path: Path) -> None:
     assert 'import "pe"' in src and "rule A" in src and "rule P" in src and "rule B" not in src
     infos = {i.name: i for i in yrlib.parse_rule_infos(f)}
     assert infos["B"].condition.strip() == "pe.is_pe" and infos["A"].scope == "memory"
+
+
+def test_record_activity_writes_memscan_source(tmp_path: Path) -> None:
+    dump = _dump(tmp_path / "proc.dmp")
+    activity = tmp_path / "activity.json"
+    # sem a flag: nada é escrito
+    assert memscan.main([str(dump), "--backend", "raw", "--activity", str(activity)]) == 0
+    assert not activity.exists()
+    # com a flag: a regra de memória que casou entra com source=memscan e a data de hoje
+    assert memscan.main([str(dump), "--backend", "raw", "--record-activity", "--activity", str(activity)]) == 0
+    data = yrlib.load_activity(activity)
+    assert list(data["rules"]) == [MEM_RULE]
+    entry = data["rules"][MEM_RULE]
+    assert entry["source"] == "memscan" and len(entry["last_match"]) == 10
+    # segundo run no mesmo dia: idempotente (conteúdo igual)
+    before = activity.read_text()
+    assert memscan.main([str(dump), "--backend", "raw", "--record-activity", "--activity", str(activity)]) == 0
+    assert activity.read_text() == before
+    # o repo não foi tocado
+    assert yrlib.load_activity()["rules"].get(MEM_RULE) is None
+
+
+def test_record_activity_without_hits_writes_nothing(tmp_path: Path) -> None:
+    clean = tmp_path / "clean.dmp"
+    clean.write_bytes(memory_region(cstrings("nothing to see here"), seed=9))
+    activity = tmp_path / "activity.json"
+    assert memscan.main([str(clean), "--backend", "raw", "--record-activity", "--activity", str(activity)]) == 0
+    assert not activity.exists()
