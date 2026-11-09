@@ -24,7 +24,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_DIR = REPO_ROOT / "rules"
 CONFIG_PATH = REPO_ROOT / "rules-ci.toml"
 
-RULE_NAME_REGEX = r"^(MAL|HUNT|SUSP)_[A-Za-z0-9]+_[A-Za-z0-9_]+$"
+# TEST: alvo de teste publicado e benigno (EICAR), não é malware nem hipótese
+RULE_NAME_REGEX = r"^(MAL|HUNT|SUSP|TEST)_[A-Za-z0-9]+_[A-Za-z0-9_]+$"
 PURPOSES = ("hunting", "triage", "blocking")
 STATUSES = ("experimental", "test", "stable", "deprecated")
 CONFIDENCES = ("low", "medium", "high")

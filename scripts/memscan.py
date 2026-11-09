@@ -219,6 +219,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-s", "--strings", action="store_true", help="imprimir string casada + offset")
     ap.add_argument("--jsonl", type=Path)
     ap.add_argument("--format", choices=("native", "ecs"), default="native")
+    ap.add_argument(
+        "--record-activity",
+        action="store_true",
+        help="marcar last_match=hoje em tests/activity.json para as regras que casaram (alimenta docs/health.md)",
+    )
+    ap.add_argument(
+        "--activity", type=Path, default=yrlib.ACTIVITY_PATH, help="arquivo de activity (default tests/activity.json)"
+    )
     args = ap.parse_args(argv)
 
     scopes = tuple(args.scope) if args.scope else MEMORY_SCOPES
@@ -228,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
 
     out = args.jsonl.open("a", encoding="utf-8") if args.jsonl else None
     n_hits = 0
+    matched_rules: set[str] = set()
     for image in args.images:
         backend = args.backend
         hits: list[dict[str, Any]] = []
@@ -257,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         for (rule, pid), group in sorted(by_rule.items(), key=lambda kv: (kv[0][0], str(kv[0][1]))):
             info = index.get(rule)
             n_hits += 1
+            matched_rules.add(rule)
             rec: dict[str, Any] = {
                 "ts": int(time.time()),
                 "rule": rule,
@@ -292,6 +302,9 @@ def main(argv: list[str] | None = None) -> int:
                 out.write(json.dumps(doc, ensure_ascii=False) + "\n")
     if out:
         out.close()
+    if args.record_activity and matched_rules:
+        n = yrlib.record_activity(matched_rules, "memscan", path=args.activity)
+        print(f"activity: {n} regra(s) atualizada(s) em {args.activity}", file=sys.stderr)
     print(f"\n{len(args.images)} imagem(ns), {n_hits} hit(s) (regra × processo)", file=sys.stderr)
     return 0
 

@@ -1,5 +1,16 @@
 {
   "schema": 1,
-  "_doc": "Último match verdadeiro por regra fora das fixtures (hunting real, amostra do samples.lock, IR). Escrito por `scripts/hunt.py --record-activity` ou à mão: {\"<regra>\": {\"last_match\": \"YYYY-MM-DD\", \"source\": \"hunt|samples|ir|manual\"}}. docs/health.md usa isto para apontar regras com FP e sem match há X semanas (candidatas a deprecated). Vazio = nenhuma regra provou utilidade fora das fixtures ainda, e o painel diz isso.",
-  "rules": {}
+  "_doc": "Último match verdadeiro por regra fora das fixtures (hunting real, amostra do samples.lock, IR). Escrito por `scripts/hunt.py --record-activity`, `scripts/memscan.py --record-activity` ou à mão: {\"<regra>\": {\"last_match\": \"YYYY-MM-DD\", \"source\": \"hunt|memscan|samples|ir|manual|published-target\"}}. docs/health.md usa isto para apontar regras com FP e sem match há X semanas (candidatas a deprecated). Vazio = nenhuma regra provou utilidade fora das fixtures ainda, e o painel diz isso.",
+  "rules": {
+    "TEST_Multi_EICAR_File": {
+      "last_match": "2026-11-09",
+      "source": "published-target",
+      "note": "a fixture é o arquivo publicado pela EICAR (sha256 275a021b...), conferido em tests/test_eicar.py; não é hunting real"
+    },
+    "TEST_Multi_EICAR_InZip_Stored": {
+      "last_match": "2026-11-09",
+      "source": "published-target",
+      "note": "a fixture é o arquivo publicado pela EICAR (sha256 275a021b...), conferido em tests/test_eicar.py; não é hunting real"
+    }
+  }
 }

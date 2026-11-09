@@ -30,7 +30,12 @@ from cases import CASES
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--strict", action="store_true", help="falhar se uma regra não listada casar")
-    ap.add_argument("--dump", metavar="DIR", help="gravar as fixtures geradas em DIR (para `yr scan -s` manual)")
+    ap.add_argument(
+        "--dump",
+        metavar="DIR",
+        help="gravar as fixtures geradas em DIR (para `yr scan -s` manual). Inclui o EICAR em claro: "
+        "um antivírus ativo vai apagar/quarentenar esses arquivos; use fora do repo",
+    )
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
