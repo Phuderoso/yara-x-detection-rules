@@ -57,11 +57,14 @@ def main(argv: list[str] | None = None) -> int:
         help="timeout por arquivo, em segundos",
     )
     ap.add_argument("--triage-warn", action="store_true", help="hits de regras triage não falham")
+    ap.add_argument(
+        "--status", type=yrlib.parse_statuses, default=(), help='só regras com estes status, ex.: "stable,test"'
+    )
     ap.add_argument("--jsonl", type=Path, help="gravar hits em JSON Lines")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
 
-    rules, index = yrlib.load_all_rules(strict=False, root=args.rules)
+    rules, index = yrlib.load_all_rules(strict=False, root=args.rules, statuses=args.status)
     scanner = yara_x.Scanner(rules)
     scanner.set_timeout(args.timeout)
 

@@ -74,10 +74,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-fixtures", action="store_true", help="não rodar tests/cases.py")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--label", default="", help="rótulo livre (ex.: base, head)")
+    ap.add_argument(
+        "--status", type=yrlib.parse_statuses, default=(), help='só regras com estes status, ex.: "stable,test"'
+    )
     args = ap.parse_args(argv)
 
     max_size = yrlib.parse_size(args.max_size)
-    files = yrlib.rule_files(args.rules) if args.rules.exists() else []
+    files = yrlib.filter_files_by_status(yrlib.rule_files(args.rules), args.status) if args.rules.exists() else []
     if not files:
         # Branch base sem regras (repo novo) ainda precisa de um relatório para o diff.
         print(f"::notice::nenhuma regra em {args.rules}; gerando relatório vazio")
@@ -87,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
             "generated": int(time.time()),
             "platform": platform.platform(),
             "git": git_info(args.rules if args.rules.exists() else yrlib.REPO_ROOT),
+            "filter": {"status": list(args.status)},
             "rules": {},
             "corpus": {"paths": [str(p) for p in args.corpus], "files": 0, "bytes": 0, "wall_seconds": 0},
             "timings": {},
@@ -163,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         "generated": int(time.time()),
         "platform": platform.platform(),
         "git": git_info(args.rules),
+        "filter": {"status": list(args.status)},
         "rules": {
             name: {
                 "id": info.rule_id,

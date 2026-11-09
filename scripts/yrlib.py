@@ -7,6 +7,7 @@ script depende do binário `yr` estar instalado.
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 import subprocess
@@ -145,6 +146,59 @@ def rule_files(root: Path = RULES_DIR) -> list[Path]:
     return files
 
 
+ACTIVITY_PATH = REPO_ROOT / "tests" / "activity.json"
+
+
+def load_activity(path: Path = ACTIVITY_PATH) -> dict[str, Any]:
+    """tests/activity.json: último match verdadeiro por regra (fora das fixtures).
+    Alimenta docs/health.md; escrito por `hunt.py --record-activity` ou à mão."""
+    if not path.exists():
+        return {"schema": 1, "rules": {}}
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    data.setdefault("rules", {})
+    return data
+
+
+def record_activity(
+    rule_names: Iterable[str], source: str, *, path: Path = ACTIVITY_PATH, today: str | None = None
+) -> int:
+    """Marca `last_match = hoje` para as regras dadas. Devolve quantas mudaram."""
+    import datetime as _dt
+
+    day = today or _dt.date.today().isoformat()
+    data = load_activity(path)
+    changed = 0
+    for name in sorted(set(rule_names)):
+        prev = data["rules"].get(name, {})
+        if prev.get("last_match") == day and prev.get("source") == source:
+            continue
+        data["rules"][name] = {"last_match": day, "source": source}
+        changed += 1
+    if changed:
+        data["rules"] = dict(sorted(data["rules"].items()))
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return changed
+
+
+def filter_files_by_status(files: list[Path], statuses: Iterable[str] | None) -> list[Path]:
+    """Mantém só os arquivos que têm ao menos uma regra com `status` no conjunto.
+    `None`/vazio = sem filtro. Um arquivo = uma regra por convenção, então isto é
+    efetivamente filtrar regras."""
+    wanted = {s.strip() for s in statuses or () if s.strip()}
+    if not wanted:
+        return list(files)
+    return [f for f in files if any(i.status in wanted for i in parse_rule_infos(f))]
+
+
+def parse_statuses(s: str | None) -> tuple[str, ...]:
+    """`"stable,test"` → ("stable", "test"); valida contra STATUSES."""
+    out = tuple(x.strip() for x in (s or "").split(",") if x.strip())
+    bad = [x for x in out if x not in STATUSES]
+    if bad:
+        raise ValueError(f"status inválido {bad}; use {list(STATUSES)}")
+    return out
+
+
 def parse_rule_infos(path: Path) -> list[RuleInfo]:
     """Extrai nome e bloco `meta` de cada regra do arquivo, sem compilar.
 
@@ -261,15 +315,18 @@ def index_rules(files: Iterable[Path]) -> dict[str, RuleInfo]:
     return index
 
 
-def load_all_rules(strict: bool = True, root: Path = RULES_DIR) -> tuple[yara_x.Rules, dict[str, RuleInfo]]:
-    """Compila tudo em `root` e devolve também um índice nome → RuleInfo.
+def load_all_rules(
+    strict: bool = True, root: Path = RULES_DIR, statuses: Iterable[str] | None = None
+) -> tuple[yara_x.Rules, dict[str, RuleInfo]]:
+    """Compila tudo em `root` (opcionalmente só regras com `status` em `statuses`) e
+    devolve também um índice nome → RuleInfo.
 
     Falha (SystemExit) se houver erro de compilação; warnings são responsabilidade
     do lint, não do scanner.
     """
-    files = rule_files(root)
+    files = filter_files_by_status(rule_files(root), statuses)
     if not files:
-        sys.exit(f"nenhum arquivo .yar encontrado em {root}")
+        sys.exit(f"nenhum arquivo .yar encontrado em {root}" + (f" com status {list(statuses)}" if statuses else ""))
     rules, _warnings, errors = compile_rules(files, strict=strict)
     if errors:
         for e in errors:

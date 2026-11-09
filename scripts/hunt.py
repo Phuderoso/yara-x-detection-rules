@@ -105,6 +105,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--purpose", choices=yrlib.PURPOSES, action="append", help="só regras com esse purpose (repetível)")
     ap.add_argument("--jsonl", type=Path, help="gravar hits em JSON Lines")
     ap.add_argument("--format", choices=("native", "ecs"), default="native", help="esquema do JSON (default native)")
+    ap.add_argument(
+        "--record-activity",
+        action="store_true",
+        help="marcar last_match=hoje em tests/activity.json para as regras que casaram (alimenta docs/health.md)",
+    )
     args = ap.parse_args(argv)
 
     rules, index = yrlib.load_all_rules(strict=False)
@@ -113,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
 
     out = args.jsonl.open("a", encoding="utf-8") if args.jsonl else None
     n_files = n_hits = 0
+    matched_rules: set[str] = set()
 
     for path in yrlib.iter_files(args.paths, max_size=args.max_size):
         data = yrlib.read_file(path)
@@ -132,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.purpose and (info is None or info.purpose not in args.purpose):
                 continue
             n_hits += 1
+            matched_rules.add(m.identifier)
             spans: list[tuple[str, int, int]] = [
                 (p.identifier, mt.offset, mt.length) for p in m.patterns for mt in p.matches
             ]
@@ -159,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if out:
         out.close()
+    if args.record_activity and matched_rules:
+        n = yrlib.record_activity(matched_rules, "hunt")
+        print(f"activity: {n} regra(s) atualizada(s) em {yrlib.ACTIVITY_PATH.name}", file=sys.stderr)
     print(f"\n{n_files} arquivo(s), {n_hits} hit(s)", file=sys.stderr)
     return 0
 
