@@ -110,6 +110,9 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="marcar last_match=hoje em tests/activity.json para as regras que casaram (alimenta docs/health.md)",
     )
+    ap.add_argument(
+        "--activity", type=Path, default=yrlib.ACTIVITY_PATH, help="arquivo de activity (default tests/activity.json)"
+    )
     args = ap.parse_args(argv)
 
     rules, index = yrlib.load_all_rules(strict=False)
@@ -167,8 +170,8 @@ def main(argv: list[str] | None = None) -> int:
     if out:
         out.close()
     if args.record_activity and matched_rules:
-        n = yrlib.record_activity(matched_rules, "hunt")
-        print(f"activity: {n} regra(s) atualizada(s) em {yrlib.ACTIVITY_PATH.name}", file=sys.stderr)
+        n = yrlib.record_activity(matched_rules, "hunt", path=args.activity)
+        print(f"activity: {n} regra(s) atualizada(s) em {args.activity}", file=sys.stderr)
     print(f"\n{n_files} arquivo(s), {n_hits} hit(s)", file=sys.stderr)
     return 0
 

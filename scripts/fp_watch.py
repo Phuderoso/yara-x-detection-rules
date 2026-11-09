@@ -13,7 +13,9 @@ Subcomandos:
             Hits novos em regra hunting são aviso. Escreve diff.json + diff.md.
   baseline  grava/atualiza a baseline a partir de um report: os hits atuais viram
             `known_fp` (FP conhecidos e aceitos), e `last_fp`/`fp_total` por regra
-            alimentam docs/health.md.
+            alimentam docs/health.md. `--from-artifact` aceita o zip (ou o diretório)
+            do artifact `fp-watch-<run>` baixado do runner, para re-baselinar no
+            ubuntu-latest sem auto-commit: a mudança fica no working tree para revisão.
   issue     abre OU atualiza uma única issue rotulada `fp-regression` com o diff.
             Idempotente: mesma regressão = nenhuma chamada de escrita; regressão
             mudou = edita o corpo; tudo limpo = comenta e fecha a issue aberta, uma vez.
@@ -24,6 +26,8 @@ Exemplos:
     python scripts/report.py --status stable,test --no-fixtures --corpus /usr/bin build/fp-corpus/pip --out build/report.json
     python scripts/fp_watch.py compare --report build/report.json --out build/diff.json --markdown build/diff.md
     python scripts/fp_watch.py baseline --report build/report.json          # aceitar o estado atual
+    gh run download <run-id> -n fp-watch-<run-id> -D build/artifact        # artifact do runner
+    python scripts/fp_watch.py baseline --from-artifact build/artifact      # propõe no working tree
     python scripts/fp_watch.py issue --diff build/diff.json --markdown build/diff.md --repo owner/name
 """
 
@@ -36,6 +40,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 import zipfile
@@ -337,6 +342,26 @@ def update_baseline(
     }
 
 
+def artifact_files(src: Path, workdir: Path) -> tuple[Path, Path | None]:
+    """`src` é o zip do artifact ou o diretório onde ele foi extraído. Devolve
+    (report.json, manifest.json|None)."""
+    root = src
+    if src.is_file() and src.suffix.lower() == ".zip":
+        root = workdir / "artifact"
+        root.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(src) as zf:
+            for member in zf.infolist():
+                target = (root / member.filename).resolve()
+                if not target.is_relative_to(root.resolve()):
+                    raise ValueError(f"caminho suspeito no artifact: {member.filename}")
+            zf.extractall(root)  # nosec B202 - membros validados acima
+    reports = sorted(root.rglob("report.json"))
+    if not reports:
+        raise FileNotFoundError(f"nenhum report.json em {src}")
+    manifests = sorted(root.rglob("manifest.json"))
+    return reports[0], (manifests[0] if manifests else None)
+
+
 # ---------------------------------------------------------------- issue
 
 
@@ -458,8 +483,10 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911 - um return por
     cp.add_argument("--run-url", default=os.environ.get("FP_WATCH_RUN_URL", ""))
     cp.add_argument("--fail", action="store_true", help="exit 1 se houver regressão")
 
-    b = sub.add_parser("baseline", help="aceita o report como baseline")
-    b.add_argument("--report", type=Path, required=True)
+    b = sub.add_parser("baseline", help="aceita o report como baseline (nunca commita)")
+    src = b.add_mutually_exclusive_group(required=True)
+    src.add_argument("--report", type=Path)
+    src.add_argument("--from-artifact", type=Path, help="zip ou diretório do artifact fp-watch-<run> do runner")
     b.add_argument("--out", type=Path, default=BASELINE_PATH)
     b.add_argument("--manifest", type=Path)
     b.add_argument("--today", type=dt.date.fromisoformat, default=None)
@@ -498,13 +525,23 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911 - um return por
         return 0
 
     if args.cmd == "baseline":
-        report = json.loads(args.report.read_text(encoding="utf-8"))
+        report_path, manifest_path = args.report, args.manifest
+        if args.from_artifact is not None:
+            with tempfile.TemporaryDirectory(prefix="fp-watch-") as tmp:
+                report_path, found_manifest = artifact_files(args.from_artifact, Path(tmp))
+                manifest_path = manifest_path or found_manifest
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                manifest_sha = _manifest_sha(manifest_path)
+        else:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            manifest_sha = _manifest_sha(manifest_path)
         prev = load_baseline(args.out) if args.out.exists() else None
-        new = update_baseline(report, prev, manifest_sha256=_manifest_sha(args.manifest), today=args.today)
+        new = update_baseline(report, prev, manifest_sha256=manifest_sha, today=args.today)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(new, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         n_fp = sum(len(r["known_fp"]) for r in new["rules"].values())
-        print(f"{args.out}: {len(new['rules'])} regra(s), {n_fp} FP conhecido(s)")
+        origin = f"artifact {args.from_artifact}" if args.from_artifact is not None else f"report {report_path}"
+        print(f"{args.out}: {len(new['rules'])} regra(s), {n_fp} FP conhecido(s) (de {origin}; revise e commite você)")
         return 0
 
     if args.cmd == "issue":

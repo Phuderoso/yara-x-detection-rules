@@ -36,6 +36,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import yrlib
@@ -225,6 +226,28 @@ def check_format(path: Path, rep: Report) -> None:
         rep.error(str(_rel(path)), "não está formatado; rode `make fmt`")
 
 
+# Warnings do compilador que uma regra pode silenciar com um comentário na MESMA linha.
+# text_as_hex: hex de propósito quando o texto literal é perigoso (EICAR dispara AV no checkout).
+SUPPRESSIBLE_WARNINGS = {"text_as_hex": "allow-hex-as-text"}
+
+
+def _warning_suppressed(w: dict[str, Any]) -> bool:
+    marker = SUPPRESSIBLE_WARNINGS.get(str(w.get("code", "")))
+    if not marker:
+        return False
+    for label in w.get("labels", []):
+        origin, line = label.get("code_origin"), label.get("line")
+        if not origin or not line:
+            continue
+        try:
+            src_line = Path(origin).read_text(encoding="utf-8").splitlines()[int(line) - 1]
+        except (OSError, IndexError, ValueError):
+            return False
+        if "//" in src_line and marker in src_line.split("//", 1)[1]:
+            return True
+    return False
+
+
 def lint(files: list[Path], *, check_fmt: bool = True, allow_warnings: bool = False) -> Report:
     rep = Report(files=len(files))
     if not files:
@@ -235,6 +258,8 @@ def lint(files: list[Path], *, check_fmt: bool = True, allow_warnings: bool = Fa
     for e in errors:
         rep.error(e["file"], "\n" + e["text"])
     for w in warnings:
+        if _warning_suppressed(w):
+            continue
         text = w.get("text", str(w))
         (rep.warn if allow_warnings else rep.error)("compiler", "\n" + text)
 

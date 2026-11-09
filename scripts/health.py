@@ -180,7 +180,8 @@ def render(rows: list[dict[str, Any]], *, as_of: dt.date, stale_weeks: int, base
     if unproven:
         w(
             "Regras `test`/`stable` sem FP e sem match registrado em `tests/activity.json`: limpas, mas ainda não "
-            "mostraram serviço. Rode `hunt.py --record-activity` num caso real ou o job `real-samples`."
+            "mostraram serviço. Rode `hunt.py --record-activity` ou `memscan.py --record-activity` num caso real, "
+            "ou o job `real-samples` com uma linha em `tests/samples.lock`."
         )
         w("")
         for r in unproven:
