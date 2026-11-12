@@ -2,8 +2,9 @@
 
 > **English note.** This handbook is written in Portuguese on purpose: it is the craft notes behind
 > the repo, not its interface. The interface (rule contract, CI, tools, doctrine) is in English in
-> [`README.md`](../README.md). If one section matters to you and machine translation is not enough,
-> open an issue and we will translate it. Everything here is CC0, like the rest of the repository.
+> [`README.md`](../README.md). An English translation of this handbook is in
+> [`handbook.en.md`](handbook.en.md); this Portuguese file stays the original. Everything here is
+> CC0, like the rest of the repository.
 
 O próximo nível não é "mais strings". É **detection engineering**: regra que
 sobrevive a corpus limpo, a um novo build da família, e a um pipeline que não
@@ -224,7 +225,7 @@ faixas de forma diferente no gate de goodware.
 
 ### Memória: por que a regra de arquivo falha lá (e o que fazer)
 
-A regra de arquivo da FamilyX começa com `uint16(0) == 0x5A4D and filesize < 2MB and pe.is_pe`.
+A regra de arquivo da FamilyX começa com `uint16(0) == 0x5A4D and filesize > 8KB and filesize < 2MB` e lê o cabeçalho PE à mão (até a v2 era `pe.is_pe`).
 Em disco isso é a melhor parte dela (barato, corta 99% antes de olhar strings).
 Num dump de processo ou numa imagem de memória, cada uma dessas três cláusulas é falsa ou sem sentido:
 

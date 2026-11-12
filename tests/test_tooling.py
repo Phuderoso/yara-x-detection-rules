@@ -253,6 +253,64 @@ def test_coverage_check_fails_when_stale(tmp_path: Path) -> None:
     assert cov.main(["--rules", str(rules_dir), "--out", str(out), "--check", "--as-of", "2026-06-01"]) == 1
 
 
+# ---------------------------------------------------------------- dataset.jsonl
+
+
+def test_dataset_jsonl_is_up_to_date_and_valid() -> None:
+    import dataset_jsonl
+
+    assert dataset_jsonl.main(["--check"]) == 0
+    lines = (yrlib.REPO_ROOT / "dataset.jsonl").read_text(encoding="utf-8").splitlines()
+    rows = [json.loads(ln) for ln in lines]
+    infos = [i for f in yrlib.rule_files() for i in yrlib.parse_rule_infos(f)]
+    assert sorted(r["name"] for r in rows) == sorted(i.name for i in infos)
+    by_case = {c.name for c in CASES}
+    for r in rows:
+        assert (yrlib.REPO_ROOT / r["path"]).is_file()
+        assert r["meta"]["status"] in yrlib.STATUSES
+        assert r["tests"]["positive"] and r["tests"]["negative"]
+        assert set(r["tests"]["positive"]) | set(r["tests"]["negative"]) <= by_case
+        if r["meta"].get("malware") == "FamilyX":
+            assert "placeholder" in r["hash_note"] and "fictícia" in r["hash_note"]
+        else:
+            assert "hash_note" not in r, r["name"]
+
+
+def test_dataset_hash_note_detects_empty_file_digests() -> None:
+    import dataset_jsonl as ds
+
+    note = ds._hash_note({"hash": "e3b0c44298fc1c149afbf4c8996fb924", "malware": "FamilyX"})
+    assert note == (
+        "placeholder (primeiros 32 hex do SHA-256 de arquivo vazio; FamilyX é fictícia, não há sample real)"
+    )
+    assert ds._hash_note({"hash": "d41d8cd98f00b204e9800998ecf8427e", "malware": "Other"}) == (
+        "placeholder (digest MD5 de arquivo vazio)"
+    )
+    real = "ed01ebfbc9eb5bbea545af4d01bf5f1071661840480439c6e5babe8e080e41aa"
+    assert ds._hash_note({"hash": real, "malware": "WannaCry"}) is None
+    assert ds._hash_note({"malware": "FamilyX"}) is None
+
+
+def test_dataset_jsonl_check_fails_when_stale(tmp_path: Path) -> None:
+    import dataset_jsonl
+
+    rules_dir = tmp_path / "rules" / "windows"
+    rules_dir.mkdir(parents=True)
+    from test_lint import make_rule
+
+    (rules_dir / "a.yar").write_text(make_rule().replace("Good_Anchor", "Old"))
+    out = tmp_path / "dataset.jsonl"
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out)]) == 0
+    row = json.loads(out.read_text())
+    assert row["name"] == "MAL_Win_Test_Old" and row["platform"] == "windows"
+    assert isinstance(row["meta"]["version"], int)
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out), "--check"]) == 0
+    (rules_dir / "b.yar").write_text(make_rule().replace("Good_Anchor", "New"))
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out), "--check"]) == 1
+    out.write_text("{not json\n")
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out), "--check"]) == 1
+
+
 def test_hunt_record_activity_to_custom_path(tmp_path: Path) -> None:
     from cases import INJECT_APIS
     from fakepe import build_pe, cstrings

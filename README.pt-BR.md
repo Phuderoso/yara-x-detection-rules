@@ -16,8 +16,8 @@ legítimo (gate de goodware real, com diff por PR). O que sai na release são bu
 `purpose`, assinados.
 
 O raciocínio (o que é uma regra boa, YARA vs YARA-X, onde ela encaixa num pipeline de hunting,
-por que regra de arquivo falha em memória) está em [`docs/handbook.md`](docs/handbook.md). O
-checklist de contribuição está em [`CONTRIBUTING.md`](CONTRIBUTING.md). O que o repo cobre hoje,
+por que regra de arquivo falha em memória) está em [`docs/handbook.md`](docs/handbook.md) (tradução em inglês:
+[`docs/handbook.en.md`](docs/handbook.en.md)). O checklist de contribuição está em [`CONTRIBUTING.md`](CONTRIBUTING.md). O que o repo cobre hoje,
 por técnica, faixa, escopo e família, está em [`docs/coverage.md`](docs/coverage.md) (gerado).
 Como ele foi construído, rodada a rodada, está em [`journal/`](journal/).
 
@@ -107,6 +107,7 @@ scripts/
   hunt.py                     varredura operacional: sha256, strings/offsets, JSONL nativo ou ECS
   memscan.py                  memória: só regras scope memory/both; backend raw (chunks) ou Volatility 3
   coverage.py                 gera docs/coverage.md do meta; a CI falha se estiver desatualizado
+  dataset_jsonl.py            gera dataset.jsonl (uma linha JSON por regra); a CI falha se estiver desatualizado
   health.py                   gera docs/health.md (FP, idade, último match, candidatas a deprecated); conferido na CI
   fp_watch.py                 vigia de FP: corpus pip fixado por hash, comparação com baseline, issue única
   build_bundles.py            bundles por purpose (.yar + .yarc) + manifest + SHA256SUMS
@@ -130,10 +131,12 @@ journal/                      diário da construção, estilo case-files, um arq
 AGENTS.md                     guia para agentes de código (layout, CI local, armadilhas do YARA-X)
 CREDITS.md                    linha de autoria (fora do README)
 llms.txt                      índice curto para modelos (llmstxt.org)
+dataset.jsonl                 gerado: uma linha JSON por regra (caminho, meta, ids das strings, casos de teste)
 .github/workflows/ci.yml      lint → fixtures → goodware ELF → diff vs base → goodware PE (windows)
 .github/workflows/release.yml tag v* → bundles → cosign → GitHub Release
 .github/workflows/fp-watch.yml semanal: corpus limpo reprodutível → regras stable/test → baseline → uma issue
-docs/handbook.md              o ofício
+docs/handbook.md              o ofício (original em português)
+docs/handbook.en.md           o ofício, tradução em inglês
 docs/coverage.md              painel gerado (MITRE, purpose × status, scope, família, experimentais > 90d)
 docs/health.md                painel gerado (status, idade, FP, último match, candidatas a deprecated)
 ```
@@ -197,7 +200,7 @@ Validado por `scripts/lint_rules.py`; a CI quebra o PR se falhar.
 
 1. **código**: ruff, ruff format, mypy (strict), pytest (lint, tooling, extrator de âncoras,
    memscan), bandit, pip-audit.
-2. **regras**: lint → fixtures → `docs/coverage.md` e `docs/health.md` em dia → goodware ELF do runner → `report.py` no head **e** no base
+2. **regras**: lint → fixtures → `docs/coverage.md`, `dataset.jsonl` e `docs/health.md` em dia → goodware ELF do runner → `report.py` no head **e** no base
    (mesmos scripts, regras do base) → `diff_report.py` publica como comentário no PR e no job
    summary: hits novos/removidos por regra (com sha256), tempo por regra com Δ%, fixtures que
    mudaram. Falha se uma regra passar de `max_rule_seconds`, regredir mais de
@@ -310,6 +313,19 @@ MITRE (com link), matriz purpose × status, por scope, por família, por engine,
 `experimental` há mais de 90 dias (candidatas a promoção ou descarte, em faixas > 90/180/365
 para o arquivo não mudar todo dia). A CI roda `--check` e falha se o arquivo commitado não
 bater com o gerado; `make coverage` regenera.
+
+## Dataset das regras (`dataset.jsonl`)
+
+`dataset.jsonl` é gerado por `scripts/dataset_jsonl.py`: um objeto JSON por regra, ordenado por
+caminho, com `path`, `line`, `name`, `platform` (o diretório em `rules/`), todos os campos de
+`meta` como escritos na regra (inteiro continua inteiro), os `imports` do arquivo, os
+identificadores das strings (só os nomes, não os valores) e `tests.positive` / `tests.negative`,
+os nomes dos casos em `tests/cases.py` que devem e que não devem casar com a regra. Quando
+`meta.hash` é prefixo do digest de um arquivo vazio, a linha ganha também `hash_note`. O `hash`
+da FamilyX é um placeholder (família fictícia), não o hash de um sample real. Fora isso, nada é
+inferido; `status` é o ciclo de vida local descrito em "Contrato de uma regra". A CI roda
+`--check` (toda linha tem que ser JSON válido e o arquivo tem que bater com o gerado);
+`make dataset` regenera.
 
 ## Varredura e SIEM
 

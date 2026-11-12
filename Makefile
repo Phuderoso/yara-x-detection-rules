@@ -3,7 +3,7 @@ GOODWARE ?= tests/goodware
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-dev)
 
 .PHONY: help setup setup-dev lint fmt fmt-check test goodware report compat bundles changelog \
-        coverage coverage-check health health-check fp-corpus fp-report fp-compare fp-baseline fp-propose \
+        coverage coverage-check dataset dataset-check health health-check fp-corpus fp-report fp-compare fp-baseline fp-propose \
         anchors memscan quality pytest ci fixtures hunt clean
 
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "bundles     bundles por purpose + manifest + SHA256SUMS em dist/ (VERSION=$(VERSION))"
 	@echo "changelog   CHANGELOG da versão a partir de commits e diff de rules/"
 	@echo "coverage    regenera docs/coverage.md a partir do meta (coverage-check: só verifica)"
+	@echo "dataset     regenera dataset.jsonl (uma linha por regra: meta + casos de teste; dataset-check: só verifica)"
 	@echo "health      regenera docs/health.md (FP, idade, último match, candidatas a deprecated)"
 	@echo "fp-corpus   baixa o corpus pip fixado por hash em build/fp-corpus (fp-report/fp-compare: o resto do vigia)"
 	@echo "fp-baseline aceita REPORT=build/report.json como tests/goodware/baseline.json"
@@ -71,6 +72,12 @@ coverage:
 coverage-check:
 	$(PYTHON) scripts/coverage.py --check
 
+dataset:
+	$(PYTHON) scripts/dataset_jsonl.py
+
+dataset-check:
+	$(PYTHON) scripts/dataset_jsonl.py --check
+
 health:
 	$(PYTHON) scripts/health.py
 
@@ -122,7 +129,7 @@ quality:
 	$(PYTHON) -m pytest -q
 	bandit -q -r scripts tests -c pyproject.toml
 
-ci: lint test coverage-check health-check goodware quality
+ci: lint test coverage-check dataset-check health-check goodware quality
 
 fixtures:
 	$(PYTHON) scripts/test_rules.py --dump build/fixtures
