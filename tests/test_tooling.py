@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import io
 import json
+import sys
 from pathlib import Path
 
 import yara_x
@@ -114,6 +116,26 @@ def test_diff_report_fixture_failure() -> None:
     head = _report([], seconds=0.1, fixtures_ok=False)
     _md, failures = diff_report.build_markdown(head, None, fail_on_new_hits=False)
     assert any("fixture" in f for f in failures)
+
+
+def test_diff_report_cli_survives_cp1252_stdout(tmp_path: Path) -> None:
+    """O passo Windows do CI cai se print(md) for para um stdout cp1252 (Δ no cabeçalho)."""
+    head_path = tmp_path / "head.json"
+    head_path.write_text(json.dumps(_report([], seconds=0.1, fixtures_ok=True)), encoding="utf-8")
+    out = tmp_path / "reports" / "diff.md"
+    fake = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict", newline="\n")
+    old = sys.stdout
+    try:
+        sys.stdout = fake
+        rc = diff_report.main(["--head", str(head_path), "--out", str(out)])
+        fake.flush()
+    finally:
+        sys.stdout = old
+        fake.close()
+    assert rc == 0
+    text = out.read_text(encoding="utf-8")
+    assert "Δ" in text
+    assert "Nenhum hit. FP gate ok." in text
 
 
 def test_corpus_manifest_diff(tmp_path: Path) -> None:

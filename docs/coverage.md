@@ -50,14 +50,14 @@ Gate de promoção: `blocking` exige `stable` + `confidence = high`; `deprecated
 
 | engine | Regras |
 |---|---:|
-| any | 4 |
-| yara-x | 1 |
+| any | 5 |
+| yara-x | 0 |
 
 `yara-x` = usa sintaxe/módulo que não compila em YARA 4.x (ver matriz em `scripts/compat_yara4.py`).
 
 ## Experimentais há mais de 90 dias
 
-Referência: 2026-11-09. Candidatas a promoção (`test`) ou descarte; idade conta desde `date`.
+Referência: 2026-11-11. Candidatas a promoção (`test`) ou descarte; idade conta desde `date`.
 
 Nenhuma (1 experimental(is) no total, todas com menos de 90 dias).
 
@@ -65,7 +65,7 @@ Nenhuma (1 experimental(is) no total, todas com menos de 90 dias).
 
 | Regra | id | v | status | purpose | scope | Família | MITRE | Arquivo |
 |---|---|---:|---|---|---|---|---|---|
-| `MAL_Win_Loader_FamilyX_ConfigMarker` | `f2522e58-c8f9-4ced-aea3-97419582c3f4` | 2 | test | triage | file | FamilyX | T1055.002, T1027 | `rules/windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar` |
+| `MAL_Win_Loader_FamilyX_ConfigMarker` | `f2522e58-c8f9-4ced-aea3-97419582c3f4` | 3 | test | triage | file | FamilyX | T1055.002, T1027 | `rules/windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar` |
 | `MAL_Win_Loader_FamilyX_InMemory` | `3c6a1f0e-7b2d-4e8a-9c41-5d2f8a0b6e17` | 1 | experimental | hunting | memory | FamilyX | T1055.002, T1027 | `rules/memory/MAL_Win_Loader_FamilyX_InMemory.yar` |
 | `MAL_Win_Ransomware_WannaCry_Strings` | `1ad79fe1-7886-4d78-b8b7-6c6498b99e98` | 1 | test | triage | file | WannaCry | T1486, T1210, T1543.003 | `rules/windows/MAL_Win_Ransomware_WannaCry_Strings.yar` |
 | `TEST_Multi_EICAR_File` | `557866dc-2447-4b56-b1ca-141721779893` | 1 | test | triage | file | EICAR-Test-File | none | `rules/multi/TEST_Multi_EICAR_File.yar` |

@@ -1,12 +1,10 @@
-import "pe"
-
 rule MAL_Win_Loader_FamilyX_ConfigMarker {
   meta:
     id           = "f2522e58-c8f9-4ced-aea3-97419582c3f4"
-    version      = 2
+    version      = 3
     author       = "detection-eng"
     date         = "2026-09-17"
-    modified     = "2026-11-09"
+    modified     = "2026-11-11"
     description  = "Family X loader: unique config marker + call-site stub"
     malware      = "FamilyX"
     status       = "test"
@@ -19,11 +17,11 @@ rule MAL_Win_Loader_FamilyX_ConfigMarker {
     // hunting | triage | blocking — a CI usa isso para decidir o gate de FP
     purpose      = "triage"
     mitre_attack = "T1055.002, T1027"
-    // file: a condição exige MZ, filesize e pe.*; a variante de memória é outra regra
+    // file: a condição exige MZ, assinatura PE e filesize; a variante de memória é outra regra
     scope        = "file"
     license      = "CC0-1.0"
-    // pe.sections.len() não existe no YARA 4.x; ver scripts/compat_yara4.py
-    engine       = "yara-x"
+    // sem import "pe": cabeçalho lido à mão, então compila também no YARA 4.x
+    engine       = "any"
 
   strings:
     // Âncoras: qualquer uma sozinha já justifica o hit
@@ -44,8 +42,11 @@ rule MAL_Win_Loader_FamilyX_ConfigMarker {
     uint16(0) == 0x5A4D and
     filesize > 8KB and
     filesize < 2MB and
-    pe.is_pe and
-    pe.sections.len() < 12 and
+    // Sem import "pe": o módulo parseia TODO arquivo escaneado, seja qual for a
+    // ordem da condição (28s no corpus PE do runner Windows). Lemos o cabeçalho à mão:
+    // e_lfanew em 0x3C -> "PE\0\0"; FileHeader.NumberOfSections em PE+6.
+    uint32(uint32(0x3C)) == 0x00004550 and
+    uint16(uint32(0x3C) + 6) < 12 and
     (
       $marker or $pdb or $ua or $decode
     ) and
