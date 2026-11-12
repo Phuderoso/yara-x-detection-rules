@@ -1,0 +1,31 @@
+# yara-x-detection-rules
+
+> A YARA-X detection-engineering repository: rules, synthetic fixtures, and a self-hosted CI gate. Dedicated to the public domain under CC0.
+
+Start with [AGENTS.md](AGENTS.md) if you are an agent, or [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/handbook.md](docs/handbook.md) if you are a person. The rule contract is the table in the README. Do not add live malware; fixtures are synthesized at test time. Validate locally with:
+
+`make lint` (compile + meta/lifecycle/uniqueness/string policies + `yr fmt`)
+
+`make test` (synthetic positives and negatives in `tests/cases.py`)
+
+`make quality` (ruff, ruff format, mypy, pytest, bandit)
+
+`make ci` also runs coverage/health checks and the goodware FP gate; it needs a local `tests/goodware/` tree. After changing a rule, increment `version` and `modified`, then run `make fmt && make lint && make test && make coverage && make health`.
+
+## Docs
+
+- [README](README.md): overview, rule contract, CI, YARA-X notes
+- [Portuguese README](README.pt-BR.md): same content in pt-BR
+- [AGENTS.md](AGENTS.md): layout, local commands, scope lint, time budget, common YARA-X mistakes
+- [Handbook](docs/handbook.md): writing guide (Portuguese, with an English note on top)
+- [CONTRIBUTING.md](CONTRIBUTING.md): contribution checklist
+- [Rule contract (English)](README.md#rule-contract): naming, required meta, status, purpose, scope lint
+- [Rule contract (pt-BR)](README.pt-BR.md#contrato-de-uma-regra): the same table in Portuguese
+- [tests/cases.py](tests/cases.py): positive and negative fixtures per rule
+
+## Optional
+
+- [CREDITS.md](CREDITS.md): authorship line
+- [SECURITY.md](SECURITY.md): how to report an FP, a bypass, or a CI problem
+- [docs/coverage.md](docs/coverage.md): generated coverage panel
+- [docs/health.md](docs/health.md): generated health panel
