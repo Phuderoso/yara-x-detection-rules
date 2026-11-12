@@ -28,8 +28,9 @@ make ci            # tudo o que a CI roda (precisa de tests/goodware/ local para
    `magic → filesize → PE barato → strings → regex/entropia/loops`.
 6. Adicione casos em `tests/cases.py`: positivos (variantes, builds diferentes) **e**
    negativos (APIs sem âncora, âncora fora de PE, fora do envelope de tamanho/seções).
-7. `make fmt && make lint && make test && make coverage && make health` (os painéis
-   `docs/coverage.md` e `docs/health.md` são gerados e a CI falha se estiverem desatualizados).
+7. `make fmt && make lint && make test && make coverage && make dataset && make health`
+   (`docs/coverage.md`, `dataset.jsonl` e `docs/health.md` são gerados e a CI falha se estiverem
+   desatualizados).
 8. `make goodware GOODWARE=/mnt/goodware` contra um corpus limpo de verdade.
 9. Abra o PR. A CI publica o diff de hits e de tempo em relação ao base.
 

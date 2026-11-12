@@ -2,8 +2,9 @@
 
 > **English note.** This handbook is written in Portuguese on purpose: it is the craft notes behind
 > the repo, not its interface. The interface (rule contract, CI, tools, doctrine) is in English in
-> [`README.md`](../README.md). If one section matters to you and machine translation is not enough,
-> open an issue and we will translate it. Everything here is CC0, like the rest of the repository.
+> [`README.md`](../README.md). An English translation of this handbook is in
+> [`handbook.en.md`](handbook.en.md); this Portuguese file stays the original. Everything here is
+> CC0, like the rest of the repository.
 
 O próximo nível não é "mais strings". É **detection engineering**: regra que
 sobrevive a corpus limpo, a um novo build da família, e a um pipeline que não
