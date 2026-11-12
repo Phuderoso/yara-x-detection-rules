@@ -253,6 +253,45 @@ def test_coverage_check_fails_when_stale(tmp_path: Path) -> None:
     assert cov.main(["--rules", str(rules_dir), "--out", str(out), "--check", "--as-of", "2026-06-01"]) == 1
 
 
+# ---------------------------------------------------------------- dataset.jsonl
+
+
+def test_dataset_jsonl_is_up_to_date_and_valid() -> None:
+    import dataset_jsonl
+
+    assert dataset_jsonl.main(["--check"]) == 0
+    lines = (yrlib.REPO_ROOT / "dataset.jsonl").read_text(encoding="utf-8").splitlines()
+    rows = [json.loads(ln) for ln in lines]
+    infos = [i for f in yrlib.rule_files() for i in yrlib.parse_rule_infos(f)]
+    assert sorted(r["name"] for r in rows) == sorted(i.name for i in infos)
+    by_case = {c.name for c in CASES}
+    for r in rows:
+        assert (yrlib.REPO_ROOT / r["path"]).is_file()
+        assert r["meta"]["status"] in yrlib.STATUSES
+        assert r["tests"]["positive"] and r["tests"]["negative"]
+        assert set(r["tests"]["positive"]) | set(r["tests"]["negative"]) <= by_case
+
+
+def test_dataset_jsonl_check_fails_when_stale(tmp_path: Path) -> None:
+    import dataset_jsonl
+
+    rules_dir = tmp_path / "rules" / "windows"
+    rules_dir.mkdir(parents=True)
+    from test_lint import make_rule
+
+    (rules_dir / "a.yar").write_text(make_rule().replace("Good_Anchor", "Old"))
+    out = tmp_path / "dataset.jsonl"
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out)]) == 0
+    row = json.loads(out.read_text())
+    assert row["name"] == "MAL_Win_Test_Old" and row["platform"] == "windows"
+    assert isinstance(row["meta"]["version"], int)
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out), "--check"]) == 0
+    (rules_dir / "b.yar").write_text(make_rule().replace("Good_Anchor", "New"))
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out), "--check"]) == 1
+    out.write_text("{not json\n")
+    assert dataset_jsonl.main(["--rules", str(tmp_path / "rules"), "--out", str(out), "--check"]) == 1
+
+
 def test_hunt_record_activity_to_custom_path(tmp_path: Path) -> None:
     from cases import INJECT_APIS
     from fakepe import build_pe, cstrings

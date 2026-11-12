@@ -68,9 +68,10 @@ jobs:
       - name: Fixtures sintéticas (positivos + negativos)
         run: python scripts/test_rules.py --strict -v
 
-      - name: Painéis gerados (docs/coverage.md, docs/health.md) em dia
+      - name: Arquivos gerados (docs/coverage.md, dataset.jsonl, docs/health.md) em dia
         run: |
           python scripts/coverage.py --check
+          python scripts/dataset_jsonl.py --check
           python scripts/health.py --check
 
       - name: Gate de FP em goodware ELF do runner

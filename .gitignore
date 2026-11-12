@@ -7,6 +7,8 @@ tests/goodware/*
 !tests/goodware/pip-corpus.txt
 samples/
 *.jsonl
+# exceção: índice gerado das regras (scripts/dataset_jsonl.py), sem hits nem samples
+!/dataset.jsonl
 *.ndjson
 
 # Saídas geradas
