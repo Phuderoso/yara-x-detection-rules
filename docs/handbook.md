@@ -57,8 +57,8 @@ Por que essa sobrevive melhor:
 - **Magic + filesize primeiro** — short-circuit. Barato. Descarta 90% do corpus antes de regex/entropia.
 - **Sem `import "pe"`** — o short-circuit vale para a condição, não para módulos: um módulo importado
   parseia **todo** arquivo escaneado antes da condição rodar. Com `pe.is_pe` e `pe.sections.len()`
-  esta regra levou 28s no corpus PE do runner Windows (orçamento: 20s); lendo o cabeçalho à mão,
-  ~0,4s. Use `pe.*` quando precisar de imports, version_info ou rich header, não para checar "é PE".
+  esta regra levou 28.14s no corpus PE do runner Windows (orçamento: 20s); lendo o cabeçalho à mão,
+  0.32s. Use `pe.*` quando precisar de imports, version_info ou rich header, não para checar "é PE".
 - **Âncora única OU hex do decoder** — um único artefato forte já justifica o hit; APIs só reforçam.
 - **Não exige todas as strings** — o próximo build pode dropar o PDB. Se você puser `all of them`, a regra morre.
 - **Não usa API sozinha** — `2 of ($api_*)` sem âncora seria um detector de "qualquer coisa que injeta", inclusive ferramentas suas.
