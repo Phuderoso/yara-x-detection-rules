@@ -225,7 +225,7 @@ faixas de forma diferente no gate de goodware.
 
 ### Memória: por que a regra de arquivo falha lá (e o que fazer)
 
-A regra de arquivo da FamilyX começa com `uint16(0) == 0x5A4D and filesize < 2MB and pe.is_pe`.
+A regra de arquivo da FamilyX começa com `uint16(0) == 0x5A4D and filesize > 8KB and filesize < 2MB` e lê o cabeçalho PE à mão (até a v2 era `pe.is_pe`).
 Em disco isso é a melhor parte dela (barato, corta 99% antes de olhar strings).
 Num dump de processo ou numa imagem de memória, cada uma dessas três cláusulas é falsa ou sem sentido:
 

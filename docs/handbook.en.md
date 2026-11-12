@@ -225,7 +225,7 @@ tiers differently in the goodware gate.
 
 ### Memory: why the file rule fails there (and what to do)
 
-The FamilyX file rule starts with `uint16(0) == 0x5A4D and filesize < 2MB and pe.is_pe`.
+The FamilyX file rule starts with `uint16(0) == 0x5A4D and filesize > 8KB and filesize < 2MB` and reads the PE header by hand (up to v2 it was `pe.is_pe`).
 On disk that is its best part (cheap, cuts 99% before looking at strings).
 In a process dump or a memory image, each of those three clauses is false or meaningless:
 

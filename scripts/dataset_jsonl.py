@@ -2,7 +2,8 @@
 """dataset.jsonl: uma linha JSON por regra, gerada do `meta` e de tests/cases.py.
 
 Só fatos que já estão no repositório: caminho, linha, nome, plataforma (o
-diretório em rules/), os campos de `meta` como escritos, imports do arquivo,
+diretório em rules/), os campos de `meta` como escritos, `hash_note` quando
+`meta.hash` é prefixo do digest de um arquivo vazio (placeholder, não sample), imports do arquivo,
 identificadores das strings (sem os valores) e os nomes dos casos em
 tests/cases.py que devem e que não devem casar com a regra. Nada é inferido.
 `status` segue o ciclo de vida local (quatro dos cinco valores do Sigma).
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import re
 import sys
@@ -34,6 +36,11 @@ SCHEMA = 1
 _STRING_ID_RE = re.compile(r"^\s*(\$[A-Za-z0-9_]*)\s*=", re.M)
 _STRINGS_BLOCK_RE = re.compile(r"\bstrings\s*:(.*?)\bcondition\s*:", re.S)
 _INT_RE = re.compile(r"^-?\d+$")
+# Famílias que o repo declara fictícias (README "Layout", tests/samples.lock): sem sample real.
+FICTIONAL_FAMILIES = frozenset({"FamilyX"})
+# Digests de um arquivo vazio: um meta.hash que é prefixo de um deles não aponta para sample nenhum.
+EMPTY_DIGESTS = {name: hashlib.new(name, b"").hexdigest() for name in ("md5", "sha1", "sha256")}
+_HASH_NAMES = {"md5": "MD5", "sha1": "SHA-1", "sha256": "SHA-256"}
 
 
 def _rel(path: Path) -> str:
@@ -63,6 +70,28 @@ def _raw_meta(source: str) -> dict[str, Any]:
     return out
 
 
+def _hash_note(meta: dict[str, Any]) -> str | None:
+    """Nota para `meta.hash` que não é hash de sample: prefixo (ou digest inteiro) de arquivo vazio."""
+    raw = meta.get("hash")
+    if not isinstance(raw, str):
+        return None
+    notes: list[str] = []
+    for value in (v.strip().lower() for v in raw.split(",")):
+        if len(value) < 8:
+            continue
+        for name, digest in EMPTY_DIGESTS.items():
+            if digest.startswith(value):
+                part = "digest" if len(value) == len(digest) else f"primeiros {len(value)} hex do"
+                notes.append(f"{part} {_HASH_NAMES[name]} de arquivo vazio")
+                break
+    if not notes:
+        return None
+    note = "placeholder (" + "; ".join(notes)
+    if meta.get("malware") in FICTIONAL_FAMILIES:
+        note += f"; {meta['malware']} é fictícia, não há sample real"
+    return note + ")"
+
+
 def _string_ids(source: str) -> list[str]:
     m = _STRINGS_BLOCK_RE.search(source)
     return _STRING_ID_RE.findall(m.group(1)) if m else []
@@ -90,19 +119,20 @@ def rows(rules_root: Path = yrlib.RULES_DIR) -> list[dict[str, Any]]:
     for f in yrlib.rule_files(rules_root):
         imports = [re.sub(r'^\s*import\s+"([^"]+)"', r"\1", s) for s in yrlib.file_imports(f)]
         for info in yrlib.parse_rule_infos(f):
-            out.append(
-                {
-                    "schema": SCHEMA,
-                    "path": _rel(info.path),
-                    "line": info.line,
-                    "name": info.name,
-                    "platform": _platform(info.path, rules_root),
-                    "meta": _raw_meta(info.source),
-                    "imports": imports,
-                    "strings": _string_ids(info.source),
-                    "tests": _tests(info.name),
-                }
-            )
+            meta = _raw_meta(info.source)
+            row: dict[str, Any] = {
+                "schema": SCHEMA,
+                "path": _rel(info.path),
+                "line": info.line,
+                "name": info.name,
+                "platform": _platform(info.path, rules_root),
+                "meta": meta,
+            }
+            note = _hash_note(meta)
+            if note:
+                row["hash_note"] = note
+            row.update({"imports": imports, "strings": _string_ids(info.source), "tests": _tests(info.name)})
+            out.append(row)
     out.sort(key=lambda r: (r["path"], r["line"]))
     return out
 

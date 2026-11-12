@@ -320,7 +320,9 @@ does not match the generated one; `make coverage` regenerates.
 path, with `path`, `line`, `name`, `platform` (the directory under `rules/`), every `meta` field as
 written in the rule (integers stay integers), the file's `imports`, the string identifiers
 (names only, not the values), and `tests.positive` / `tests.negative`, the names of the cases in
-`tests/cases.py` that must and must not match the rule. Nothing is inferred; `status` is the
+`tests/cases.py` that must and must not match the rule. When `meta.hash` is a prefix of the
+digest of an empty file, the row also gets `hash_note`. The FamilyX `hash` is a placeholder
+(FamilyX is a fictional family), not the hash of a real sample. Nothing else is inferred; `status` is the
 local lifecycle described in "Rule contract". The CI runs `--check` (every line must parse as
 JSON and the file must match the generated one); `make dataset` regenerates.
 

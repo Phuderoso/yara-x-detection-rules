@@ -320,7 +320,9 @@ bater com o gerado; `make coverage` regenera.
 caminho, com `path`, `line`, `name`, `platform` (o diretório em `rules/`), todos os campos de
 `meta` como escritos na regra (inteiro continua inteiro), os `imports` do arquivo, os
 identificadores das strings (só os nomes, não os valores) e `tests.positive` / `tests.negative`,
-os nomes dos casos em `tests/cases.py` que devem e que não devem casar com a regra. Nada é
+os nomes dos casos em `tests/cases.py` que devem e que não devem casar com a regra. Quando
+`meta.hash` é prefixo do digest de um arquivo vazio, a linha ganha também `hash_note`. O `hash`
+da FamilyX é um placeholder (família fictícia), não o hash de um sample real. Fora isso, nada é
 inferido; `status` é o ciclo de vida local descrito em "Contrato de uma regra". A CI roda
 `--check` (toda linha tem que ser JSON válido e o arquivo tem que bater com o gerado);
 `make dataset` regenera.

@@ -270,6 +270,25 @@ def test_dataset_jsonl_is_up_to_date_and_valid() -> None:
         assert r["meta"]["status"] in yrlib.STATUSES
         assert r["tests"]["positive"] and r["tests"]["negative"]
         assert set(r["tests"]["positive"]) | set(r["tests"]["negative"]) <= by_case
+        if r["meta"].get("malware") == "FamilyX":
+            assert "placeholder" in r["hash_note"] and "fictícia" in r["hash_note"]
+        else:
+            assert "hash_note" not in r, r["name"]
+
+
+def test_dataset_hash_note_detects_empty_file_digests() -> None:
+    import dataset_jsonl as ds
+
+    note = ds._hash_note({"hash": "e3b0c44298fc1c149afbf4c8996fb924", "malware": "FamilyX"})
+    assert note == (
+        "placeholder (primeiros 32 hex do SHA-256 de arquivo vazio; FamilyX é fictícia, não há sample real)"
+    )
+    assert ds._hash_note({"hash": "d41d8cd98f00b204e9800998ecf8427e", "malware": "Other"}) == (
+        "placeholder (digest MD5 de arquivo vazio)"
+    )
+    real = "ed01ebfbc9eb5bbea545af4d01bf5f1071661840480439c6e5babe8e080e41aa"
+    assert ds._hash_note({"hash": real, "malware": "WannaCry"}) is None
+    assert ds._hash_note({"malware": "FamilyX"}) is None
 
 
 def test_dataset_jsonl_check_fails_when_stale(tmp_path: Path) -> None:
