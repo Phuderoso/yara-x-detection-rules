@@ -165,6 +165,35 @@ def build_markdown(head: dict[str, Any], base: dict[str, Any] | None, fail_on_ne
     return "\n".join(md), failures
 
 
+def _print_markdown(md: str) -> None:
+    """Imprime o markdown mesmo quando o stdout é uma code page antiga (cp1252 no runner Windows).
+
+    O cabeçalho de performance usa 'Δ', e o corpo pode ter '→' ou '…'; nenhum está no cp1252.
+    """
+    try:
+        print(md)
+        return
+    except UnicodeEncodeError:
+        pass
+    stream = sys.stdout
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is not None:
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+            print(md)
+            return
+        except (OSError, ValueError, UnicodeEncodeError):
+            pass
+    encoding = getattr(stream, "encoding", None) or "cp1252"
+    data = (md + "\n").encode(encoding, errors="replace")
+    buf = getattr(stream, "buffer", None)
+    if buf is not None:
+        buf.write(data)
+        buf.flush()
+        return
+    sys.stdout.write(data.decode(encoding, errors="replace") + "\n")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--head", type=Path, required=True)
@@ -177,13 +206,15 @@ def main(argv: list[str] | None = None) -> int:
     base = json.loads(args.base.read_text(encoding="utf-8")) if args.base and args.base.exists() else None
     md, failures = build_markdown(head, base, args.fail_on_new_hits)
 
-    print(md)
+    # Grava o arquivo antes do print: no Windows o print(md) pode falhar e o artifact ficaria incompleto.
     if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(md, encoding="utf-8")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as fh:
             fh.write(md + "\n")
+    _print_markdown(md)
     return 1 if failures else 0
 
 

@@ -19,6 +19,9 @@ permissions:
 
 env:
   LINUX_CORPUS: /usr/bin /usr/sbin /usr/lib/x86_64-linux-gnu /usr/libexec
+  # O runner Windows reporta stdout como cp1252; sem isto, print() quebra no "Δ" do diff_report.py
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
 
 jobs:
   code-quality:

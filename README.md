@@ -90,7 +90,7 @@ and `make quality`.
 ```text
 rules/                        rules, one per file
   _TEMPLATE.yar               starting point (prefix "_" = ignored by the CI)
-  windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar   scope = file (MZ, filesize, pe.*); fictional family
+  windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar   scope = file (MZ, PE header, filesize); fictional family
   windows/MAL_Win_Ransomware_WannaCry_Strings.yar   public family, strings and hashes from cited vendor reports
   memory/MAL_Win_Loader_FamilyX_InMemory.yar        scope = memory (decoder or decrypted config)
   multi/TEST_Multi_EICAR_File.yar                   the published EICAR test file (real, benign target)
@@ -331,8 +331,11 @@ This repo is YARA-X (`yara-x` bindings ≥ 1.23). Two things the compiler alread
 example rule that matter for migrations:
 
 - a string declared and not used in the condition is an **error** (`E022`), not a warning;
-- `pe.number_of_sections` is deprecated → `pe.sections.len()` (which does not exist in YARA 4.x,
-  which is why the example rule declares `engine = "yara-x"`).
+- `pe.number_of_sections` is deprecated → `pe.sections.len()` (which does not exist in YARA 4.x);
+- `import "pe"` parses **every** scanned file, whatever the condition order: `uint16(0) == 0x5A4D`
+  first does not skip it. On the Windows runner's PE corpus that cost 28s for one rule, so since v3
+  the example rule reads the header by hand (`uint32(uint32(0x3C)) == 0x00004550`,
+  `uint16(uint32(0x3C) + 6) < 12`) and no longer needs `engine = "yara-x"`.
 
 Equivalent CLI, if you prefer the `yr` binary:
 
