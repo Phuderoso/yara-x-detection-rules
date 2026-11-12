@@ -28,8 +28,8 @@ jobs:
     name: código (ruff, mypy, pytest, bandit, pip-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -52,8 +52,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -81,7 +81,7 @@ jobs:
 
       - name: Checkout do branch base (só rules/)
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.base_ref }}
           path: base
@@ -101,7 +101,7 @@ jobs:
 
       - name: Comentar o diff no PR
         if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -134,7 +134,7 @@ jobs:
           pip install yara-python
           python scripts/compat_yara4.py --json reports/compat-yara4.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports-linux
@@ -149,8 +149,8 @@ jobs:
     needs: rules
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -186,7 +186,7 @@ jobs:
           } else {
             Write-Output "::notice::sem manifesto fixado em tests/goodware/manifests/windows-latest.json; baixe o artifact 'reports-windows' e commite-o para fixar o corpus"
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports-windows
@@ -202,8 +202,8 @@ jobs:
     needs: rules
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
