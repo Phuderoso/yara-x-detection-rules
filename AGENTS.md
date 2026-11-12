@@ -63,3 +63,78 @@ Windows runner's PE corpus, `MAL_Win_Loader_FamilyX_ConfigMarker` with `import "
 `e_lfanew`, `NumberOfSections`) and the same corpus takes 0.32s. Use `pe.*` when you need
 imports, version_info, or the rich header — not to ask "is this a PE?". See
 `journal/2026-11-11-pe-budget.md` and `docs/handbook.md`.
+
+## Common AI mistakes writing YARA-X
+
+The compiler and [`docs/handbook.md`](docs/handbook.md) already caught these in the
+example rule. They are frequent when a model writes YARA-X as if it were YARA 4.x.
+Scan times below are the author's measurements on the Windows runner's PE corpus,
+not a published benchmark.
+
+### Unused strings are an error (`E022`)
+
+YARA 4.x warned; YARA-X fails the compile. Do not leave `$fp_*` strings "for decoration".
+
+```yara
+// before — does not compile on YARA-X (E022)
+strings:
+  $marker = "CONFIG_START::mutex_id::"
+  $fp_nsis = "NullsoftInst"  // never referenced
+condition:
+  $marker
+
+// after
+strings:
+  $marker = "CONFIG_START::mutex_id::"
+condition:
+  $marker
+```
+
+### `pe.number_of_sections` → `pe.sections.len()`
+
+```yara
+// before — deprecated in YARA-X
+import "pe"
+condition:
+  pe.number_of_sections < 12
+
+// after — YARA-X only; pe.sections.len() does not exist in YARA 4.x
+import "pe"
+condition:
+  pe.sections.len() < 12
+```
+
+This repo requires zero compiler warnings, so a deprecated field is not an option. If
+the rule must also compile on YARA 4.x, do not use `pe.sections.len()`; read the header
+by hand (next example). That is what `MAL_Win_Loader_FamilyX_ConfigMarker` v3 does.
+
+### `import "pe"` is paid for every file
+
+A YARA-X module parses every scanned file, before and independently of the condition.
+Writing `uint16(0) == 0x5A4D` first short-circuits the condition, not the module. Use
+`pe.*` when you need imports, version_info, or the rich header — not to ask "is this a
+PE?". See [`docs/handbook.md`](docs/handbook.md) and
+[`journal/2026-11-11-pe-budget.md`](journal/2026-11-11-pe-budget.md).
+
+```yara
+// before — 28.14s for one rule on the Windows runner's PE corpus (budget 20s)
+import "pe"
+condition:
+  uint16(0) == 0x5A4D and
+  filesize < 2MB and
+  pe.is_pe and
+  pe.sections.len() < 12 and
+  ($marker or $pdb or $ua or $decode) and
+  2 of ($api_*)
+
+// after — FamilyX v3 reads two header facts by hand; same corpus 0.32s;
+// no engine = "yara-x" needed, and the rule compiles on YARA 4.x
+condition:
+  uint16(0) == 0x5A4D and
+  filesize > 8KB and
+  filesize < 2MB and
+  uint32(uint32(0x3C)) == 0x00004550 and  // "PE\0\0" at e_lfanew
+  uint16(uint32(0x3C) + 6) < 12 and       // FileHeader.NumberOfSections
+  ($marker or $pdb or $ua or $decode) and
+  2 of ($api_*)
+```

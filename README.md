@@ -127,6 +127,9 @@ tests/
   test_lint.py, test_tooling.py, test_fp_watch.py, test_health.py   pytest for the tooling
   goodware/                   local clean corpus (git-ignored) + manifests/, baseline.json, pip-corpus.txt
 journal/                      build diary, case-files style, one file per day
+AGENTS.md                     guidance for coding agents (layout, local CI, YARA-X pitfalls)
+CREDITS.md                    authorship line (kept out of the README)
+llms.txt                      short index for language models (llmstxt.org)
 .github/workflows/ci.yml      lint → fixtures → goodware ELF → diff vs base → goodware PE (windows)
 .github/workflows/release.yml tag v* → bundles → cosign → GitHub Release
 .github/workflows/fp-watch.yml weekly: reproducible clean corpus → stable/test rules → baseline → one issue
@@ -338,6 +341,10 @@ example rule that matter for migrations:
   `uint16(uint32(0x3C) + 6) < 12`), the same corpus takes 0.32s, and the rule no longer needs
   `engine = "yara-x"`.
 
+Before/after examples of the mistakes models often make when writing YARA-X (unused
+string = `E022`, `pe.number_of_sections` → `pe.sections.len()`, cost of `import "pe"`)
+are in [`AGENTS.md`](AGENTS.md#common-ai-mistakes-writing-yara-x).
+
 Equivalent CLI, if you prefer the `yr` binary:
 
 ```bash
@@ -346,6 +353,59 @@ yr fmt rules/                        # formats
 yr scan -s rules/ sample.bin         # matched strings
 yr scan -C dist/triage.yarc corpus/  # compiled bundle
 ```
+
+## Related work
+
+This repository is not a large public rule pack, and several of its ideas already exist
+elsewhere. What it tries to be is one small, self-hosted, [CC0](LICENSE) pipeline that is
+native to YARA-X.
+
+Prior art we learned from (and do not replace):
+
+- [YARA Style Guide](https://github.com/Neo23x0/YARA-Style-Guide) (Florian Roth) — naming,
+  required meta, readable structure.
+- [YARA Forge](https://github.com/YARAHQ/yara-forge) — aggregates and quality-checks public
+  rule sets into ready-made packages.
+- [YARA-CI](https://yara-ci.cloud.virustotal.com/) (VirusTotal) — an external GitHub service
+  that validates rules and scans a large goodware corpus.
+- [yaraQA](https://github.com/Neo23x0/yaraQA) — static quality and performance checks on
+  YARA rules.
+- [mkYARA](https://github.com/fox-it/mkyara) (Fox-IT) and
+  [YARA-Signator](https://github.com/fxb-cocacoding/yara-signator) — automatic rule generation
+  from code, including operand wildcards. This repo's [`tools/anchors`](tools/anchors/README.md)
+  is a small cousin, not a replacement.
+- [Elastic YARA rules](https://github.com/elastic/protections-artifacts) use `scan_context`
+  (`file`, `memory`) in meta; this repo's `scope` field plays a similar role.
+- [Sigma](https://github.com/SigmaHQ/sigma) popularized a status lifecycle (`experimental` /
+  `test` / `stable` / `deprecated`); this repo uses the same four values as a local policy,
+  not as a Sigma port.
+- [Volatility 3](https://github.com/volatilityfoundation/volatility3) already scans memory
+  with YARA/YARA-X; [`scripts/memscan.py`](scripts/memscan.py) is a thin wrapper around raw
+  dumps and vol3, not a new memory-forensics framework.
+
+What this repo does differently, on purpose:
+
+- Everything lives in one small self-hosted pipeline: lint, synthetic fixtures, a goodware
+  gate, a per-PR hit and time diff, weekly fp-watch, coverage and health panels, and signed
+  releases. YARA-CI is an external service; the tools above are separate projects.
+- It is written for YARA-X first. Most of the public tooling grew up on YARA 4.x.
+- [`scripts/lint_rules.py`](scripts/lint_rules.py) rejects `filesize`, `pe.*` and `uintN(0)`
+  in rules with `scope = "memory"` or `"both"`. We are not aware of a public linter that
+  enforces that specifically.
+- Fixtures are built at runtime in memory ([`tests/fakepe.py`](tests/fakepe.py),
+  [`tests/eicar.py`](tests/eicar.py)). No real malware is committed; the EICAR literal is
+  stored only as hex so checkouts do not trip antivirus.
+- Every PR gets a diff of hits and time per rule against the base branch, a time budget,
+  and (on a schedule) fp-watch against a pinned clean corpus, plus a health panel with
+  deprecation candidates.
+
+Honest limits: there are only five rules today — two for the fictional FamilyX loader, two
+for the published EICAR test file, and one for WannaCry built from cited public reports.
+This is a repository-model and a harness, not a coverage pack. Naming, required meta, the
+`purpose` FP gate, string floors and the time budget in `rules-ci.toml` are this
+repository's policies, not a community standard. Scan times quoted in the docs (28.14s
+before v3, 0.32s after, on the Windows runner's PE corpus) are the author's own
+measurements on that runner, not a published benchmark.
 
 ## Security of the tooling itself
 
@@ -357,8 +417,5 @@ yr scan -C dist/triage.yarc corpus/  # compiled bundle
 
 Everything in this repository, rules and code alike, is dedicated to the public domain under
 [CC0 1.0 Universal](LICENSE). No attribution required; it is appreciated. Rules may carry
-`license = "CC0-1.0"` in `meta` so the dedication travels with the bundle.
-
----
-
-— Phuderoso (Papai) · Lume (Familiar de Elyra) · Composer/Claude session · 2026
+`license = "CC0-1.0"` in `meta` so the dedication travels with the bundle. Credits:
+[CREDITS.md](CREDITS.md).

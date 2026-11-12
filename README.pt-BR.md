@@ -127,6 +127,9 @@ tests/
   test_lint.py, test_tooling.py, test_fp_watch.py, test_health.py   pytest do tooling
   goodware/                   corpus limpo local (ignorado pelo git) + manifests/, baseline.json, pip-corpus.txt
 journal/                      diário da construção, estilo case-files, um arquivo por dia
+AGENTS.md                     guia para agentes de código (layout, CI local, armadilhas do YARA-X)
+CREDITS.md                    linha de autoria (fora do README)
+llms.txt                      índice curto para modelos (llmstxt.org)
 .github/workflows/ci.yml      lint → fixtures → goodware ELF → diff vs base → goodware PE (windows)
 .github/workflows/release.yml tag v* → bundles → cosign → GitHub Release
 .github/workflows/fp-watch.yml semanal: corpus limpo reprodutível → regras stable/test → baseline → uma issue
@@ -338,6 +341,10 @@ de exemplo e que valem para migrações:
   (`uint32(uint32(0x3C)) == 0x00004550`, `uint16(uint32(0x3C) + 6) < 12`), o mesmo corpus leva
   0.32s, e a regra não precisa mais de `engine = "yara-x"`.
 
+Exemplos antes/depois dos erros que modelos costumam cometer ao escrever YARA-X
+(string não usada = `E022`, `pe.number_of_sections` → `pe.sections.len()`, custo do
+`import "pe"`) estão em [`AGENTS.md`](AGENTS.md#common-ai-mistakes-writing-yara-x).
+
 CLI equivalente, se preferir o binário `yr`:
 
 ```bash
@@ -346,6 +353,62 @@ yr fmt rules/                        # formata
 yr scan -s rules/ sample.bin         # strings casadas
 yr scan -C dist/triage.yarc corpus/  # bundle compilado
 ```
+
+## Trabalhos relacionados
+
+Este repositório não é um pacote grande de regras públicas, e várias das ideias já existem
+em outros lugares. O que ele tenta ser é um pipeline único, pequeno, auto-hospedado e
+[CC0](LICENSE), nativo de YARA-X.
+
+Trabalho anterior de que aprendemos (e que não substituímos):
+
+- [YARA Style Guide](https://github.com/Neo23x0/YARA-Style-Guide) (Florian Roth) — nomes,
+  meta obrigatório, estrutura legível.
+- [YARA Forge](https://github.com/YARAHQ/yara-forge) — agrega e faz QA de conjuntos
+  públicos e publica pacotes prontos.
+- [YARA-CI](https://yara-ci.cloud.virustotal.com/) (VirusTotal) — serviço externo no
+  GitHub que valida regras e varre um corpus grande de goodware.
+- [yaraQA](https://github.com/Neo23x0/yaraQA) — checagens estáticas de qualidade e
+  desempenho em regras YARA.
+- [mkYARA](https://github.com/fox-it/mkyara) (Fox-IT) e
+  [YARA-Signator](https://github.com/fxb-cocacoding/yara-signator) — geração automática
+  de regras a partir de código, inclusive com wildcard em operandos. O
+  [`tools/anchors`](tools/anchors/README.md) deste repo é um primo pequeno, não um
+  substituto.
+- As [regras YARA da Elastic](https://github.com/elastic/protections-artifacts) usam
+  `scan_context` (`file`, `memory`) no meta; o campo `scope` deste repo tem um papel
+  parecido.
+- O [Sigma](https://github.com/SigmaHQ/sigma) popularizou um ciclo de vida de status
+  (`experimental` / `test` / `stable` / `deprecated`); este repo usa os mesmos quatro
+  valores como política local, não como um port do Sigma.
+- O [Volatility 3](https://github.com/volatilityfoundation/volatility3) já varre memória
+  com YARA/YARA-X; o [`scripts/memscan.py`](scripts/memscan.py) é um wrapper fino sobre
+  dumps crus e vol3, não um framework novo de forense.
+
+O que este repo faz de diferente, de propósito:
+
+- Tudo vive num pipeline único, pequeno e auto-hospedado: lint, fixtures sintéticas, gate
+  de goodware, diff de hits e tempo por PR, fp-watch semanal, painéis de cobertura e
+  saúde, e releases assinados. O YARA-CI é um serviço externo; as ferramentas acima são
+  projetos separados.
+- É nativo de YARA-X. Quase todo esse ferramental público nasceu para YARA 4.x.
+- O [`scripts/lint_rules.py`](scripts/lint_rules.py) rejeita `filesize`, `pe.*` e
+  `uintN(0)` em regras com `scope = "memory"` ou `"both"`. Não conhecemos um linter
+  público que imponha exatamente isso.
+- As fixtures são montadas em memória na hora do teste ([`tests/fakepe.py`](tests/fakepe.py),
+  [`tests/eicar.py`](tests/eicar.py)). Nenhum malware real é commitado; o literal do EICAR
+  fica só em hex para o checkout não disparar antivírus.
+- Cada PR ganha um diff de hits e tempo por regra contra a branch base, um orçamento de
+  tempo, e (na agenda) o fp-watch contra um corpus limpo fixado por hash, além de um
+  painel de saúde com candidatas a depreciação.
+
+Limites honestos: hoje há só cinco regras — duas do loader fictício FamilyX, duas do
+arquivo de teste EICAR publicado, e uma do WannaCry montada a partir de relatórios
+públicos citados. Isto é um repositório-modelo e um harness, não um pacote de cobertura.
+Nomes, meta obrigatório, o gate de FP por `purpose`, os pisos de string e o orçamento em
+`rules-ci.toml` são políticas deste repositório, não um padrão da comunidade. Os tempos
+citados na documentação (28.14s antes da v3, 0.32s depois, no corpus PE do runner
+Windows) são medições do autor naquele runner, não um benchmark publicado.
 
 ## Segurança do próprio tooling
 
@@ -357,8 +420,5 @@ yr scan -C dist/triage.yarc corpus/  # bundle compilado
 
 Tudo neste repositório, regras e código, está dedicado ao domínio público sob
 [CC0 1.0 Universal](LICENSE). Atribuição não é exigida; é bem-vinda. As regras podem carregar
-`license = "CC0-1.0"` no `meta` para a dedicação viajar junto com o bundle.
-
----
-
-— Phuderoso (Papai) · Lume (Familiar de Elyra) · Composer/Claude session · 2026
+`license = "CC0-1.0"` no `meta` para a dedicação viajar junto com o bundle. Créditos:
+[CREDITS.md](CREDITS.md).
