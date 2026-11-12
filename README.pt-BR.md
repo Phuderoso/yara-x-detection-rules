@@ -90,7 +90,7 @@ Para desenvolver tooling: `make setup-dev` (ruff, mypy, pytest, bandit, yara-pyt
 ```text
 rules/                        regras, uma por arquivo
   _TEMPLATE.yar               ponto de partida (prefixo "_" = ignorado pela CI)
-  windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar   scope = file (MZ, filesize, pe.*); família fictícia
+  windows/MAL_Win_Loader_FamilyX_ConfigMarker.yar   scope = file (MZ, cabeçalho PE, filesize); família fictícia
   windows/MAL_Win_Ransomware_WannaCry_Strings.yar   família pública, strings e hashes de relatórios citados
   memory/MAL_Win_Loader_FamilyX_InMemory.yar        scope = memory (decoder ou config decifrada)
   multi/TEST_Multi_EICAR_File.yar                   o arquivo de teste EICAR publicado (alvo real, benigno)
@@ -331,8 +331,12 @@ Este repo é YARA-X (bindings `yara-x` ≥ 1.23). Duas coisas que o compilador j
 de exemplo e que valem para migrações:
 
 - string declarada e não usada na condição é **erro** (`E022`), não warning;
-- `pe.number_of_sections` está deprecado → `pe.sections.len()` (que não existe no YARA 4.x,
-  por isso a regra de exemplo declara `engine = "yara-x"`).
+- `pe.number_of_sections` está deprecado → `pe.sections.len()` (que não existe no YARA 4.x);
+- `import "pe"` parseia **todo** arquivo escaneado, seja qual for a ordem da condição:
+  `uint16(0) == 0x5A4D` primeiro não evita o parse. No corpus PE do runner Windows isso custou 28s
+  para uma regra, então desde a v3 a regra de exemplo lê o cabeçalho à mão
+  (`uint32(uint32(0x3C)) == 0x00004550`, `uint16(uint32(0x3C) + 6) < 12`) e não precisa mais de
+  `engine = "yara-x"`.
 
 CLI equivalente, se preferir o binário `yr`:
 

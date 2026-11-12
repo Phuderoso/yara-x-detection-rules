@@ -46,8 +46,8 @@ condition:
   uint16(0) == 0x5A4D and
   filesize > 8KB and
   filesize < 2MB and
-  pe.is_pe and
-  pe.sections.len() < 12 and
+  uint32(uint32(0x3C)) == 0x00004550 and   // "PE\0\0" em e_lfanew
+  uint16(uint32(0x3C) + 6) < 12 and        // NumberOfSections
   ( $marker or $pdb or $ua or $decode ) and
   2 of ($api_*)
 ```
@@ -55,6 +55,10 @@ condition:
 Por que essa sobrevive melhor:
 
 - **Magic + filesize primeiro** — short-circuit. Barato. Descarta 90% do corpus antes de regex/entropia.
+- **Sem `import "pe"`** — o short-circuit vale para a condição, não para módulos: um módulo importado
+  parseia **todo** arquivo escaneado antes da condição rodar. Com `pe.is_pe` e `pe.sections.len()`
+  esta regra levou 28s no corpus PE do runner Windows (orçamento: 20s); lendo o cabeçalho à mão,
+  ~0,4s. Use `pe.*` quando precisar de imports, version_info ou rich header, não para checar "é PE".
 - **Âncora única OU hex do decoder** — um único artefato forte já justifica o hit; APIs só reforçam.
 - **Não exige todas as strings** — o próximo build pode dropar o PDB. Se você puser `all of them`, a regra morre.
 - **Não usa API sozinha** — `2 of ($api_*)` sem âncora seria um detector de "qualquer coisa que injeta", inclusive ferramentas suas.
@@ -63,8 +67,8 @@ Duas correções que o compilador do YARA-X impôs sobre a versão original:
 string declarada e não referenciada na condição é **erro** (não deixe `$fp_*`
 "de enfeite"), e `pe.number_of_sections` virou `pe.sections.len()`. Uma
 consequência da segunda: `pe.sections.len()` não existe no YARA 4.x, então a
-regra declara `engine = "yara-x"` e aparece como "só YARA-X" na matriz de
-compatibilidade da CI.
+regra declarava `engine = "yara-x"`. Desde a v3 ela não importa `pe` (ver acima),
+compila no YARA 4.x e aparece como portável na matriz de compatibilidade da CI.
 
 ### Anti-FP: o checklist que importa
 
