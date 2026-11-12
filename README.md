@@ -377,8 +377,8 @@ Prior art we learned from (and do not replace):
 - [Elastic YARA rules](https://github.com/elastic/protections-artifacts) use `scan_context`
   (`file`, `memory`) in meta; this repo's `scope` field plays a similar role.
 - [Sigma](https://github.com/SigmaHQ/sigma) popularized a status lifecycle (`experimental` /
-  `test` / `stable` / `deprecated`); this repo uses the same four values as a local policy,
-  not as a Sigma port.
+  `test` / `stable` / `deprecated` / `unsupported`); this repo uses four of Sigma's five
+  values (all but `unsupported`) as a local policy, not as a Sigma port.
 - [Volatility 3](https://github.com/volatilityfoundation/volatility3) already scans memory
   with YARA/YARA-X; [`scripts/memscan.py`](scripts/memscan.py) is a thin wrapper around raw
   dumps and vol3, not a new memory-forensics framework.

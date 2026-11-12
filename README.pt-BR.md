@@ -379,8 +379,9 @@ Trabalho anterior de que aprendemos (e que não substituímos):
   `scan_context` (`file`, `memory`) no meta; o campo `scope` deste repo tem um papel
   parecido.
 - O [Sigma](https://github.com/SigmaHQ/sigma) popularizou um ciclo de vida de status
-  (`experimental` / `test` / `stable` / `deprecated`); este repo usa os mesmos quatro
-  valores como política local, não como um port do Sigma.
+  (`experimental` / `test` / `stable` / `deprecated` / `unsupported`); este repo usa
+  quatro dos cinco valores do Sigma (todos menos `unsupported`) como política local,
+  não como um port do Sigma.
 - O [Volatility 3](https://github.com/volatilityfoundation/volatility3) já varre memória
   com YARA/YARA-X; o [`scripts/memscan.py`](scripts/memscan.py) é um wrapper fino sobre
   dumps crus e vol3, não um framework novo de forense.
