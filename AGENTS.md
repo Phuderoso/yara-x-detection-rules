@@ -121,6 +121,7 @@ PE?". See [`docs/handbook.md`](docs/handbook.md) and
 import "pe"
 condition:
   uint16(0) == 0x5A4D and
+  filesize > 8KB and
   filesize < 2MB and
   pe.is_pe and
   pe.sections.len() < 12 and
