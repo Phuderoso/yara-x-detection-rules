@@ -227,7 +227,7 @@ Tag `vX.Y.Z` (semver; `-rc1` etc. vira pre-release) dispara `release.yml`:
 
 ```bash
 cosign verify-blob --bundle blocking.yar.sigstore.json \
-  --certificate-identity-regexp '^https://github.com/<org>/<repo>/\.github/workflows/release\.yml@refs/tags/' \
+  --certificate-identity-regexp '^https://github.com/Phuderoso/yara-x-detection-rules/\.github/workflows/release\.yml@refs/tags/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   blocking.yar
 ```
@@ -333,10 +333,10 @@ de exemplo e que valem para migrações:
 - string declarada e não usada na condição é **erro** (`E022`), não warning;
 - `pe.number_of_sections` está deprecado → `pe.sections.len()` (que não existe no YARA 4.x);
 - `import "pe"` parseia **todo** arquivo escaneado, seja qual for a ordem da condição:
-  `uint16(0) == 0x5A4D` primeiro não evita o parse. No corpus PE do runner Windows isso custou 28s
-  para uma regra, então desde a v3 a regra de exemplo lê o cabeçalho à mão
-  (`uint32(uint32(0x3C)) == 0x00004550`, `uint16(uint32(0x3C) + 6) < 12`) e não precisa mais de
-  `engine = "yara-x"`.
+  `uint16(0) == 0x5A4D` primeiro não evita o parse. No corpus PE do runner Windows isso custou
+  28.14s para uma regra; desde a v3 a regra de exemplo lê o cabeçalho à mão
+  (`uint32(uint32(0x3C)) == 0x00004550`, `uint16(uint32(0x3C) + 6) < 12`), o mesmo corpus leva
+  0.32s, e a regra não precisa mais de `engine = "yara-x"`.
 
 CLI equivalente, se preferir o binário `yr`:
 
@@ -351,9 +351,6 @@ yr scan -C dist/triage.yarc corpus/  # bundle compilado
 
 - SAST: `bandit` nos scripts a cada PR; `pip-audit` nas dependências; Dependabot semanal para
   pip e GitHub Actions.
-- **Aikido**: a regra do workspace pede scan Aikido do código gerado, mas o servidor exige login
-  interativo que ainda não aconteceu. Bandit + pip-audit cobrem o intervalo; o scan Aikido
-  continua **pendente** até o login (`/aikido:setup`).
 - Como reportar FP, bypass ou problema de CI: [`SECURITY.md`](SECURITY.md).
 
 ## Licença

@@ -226,7 +226,7 @@ A `vX.Y.Z` tag (semver; `-rc1` etc. becomes a pre-release) triggers `release.yml
 
 ```bash
 cosign verify-blob --bundle blocking.yar.sigstore.json \
-  --certificate-identity-regexp '^https://github.com/<org>/<repo>/\.github/workflows/release\.yml@refs/tags/' \
+  --certificate-identity-regexp '^https://github.com/Phuderoso/yara-x-detection-rules/\.github/workflows/release\.yml@refs/tags/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   blocking.yar
 ```
@@ -333,9 +333,10 @@ example rule that matter for migrations:
 - a string declared and not used in the condition is an **error** (`E022`), not a warning;
 - `pe.number_of_sections` is deprecated → `pe.sections.len()` (which does not exist in YARA 4.x);
 - `import "pe"` parses **every** scanned file, whatever the condition order: `uint16(0) == 0x5A4D`
-  first does not skip it. On the Windows runner's PE corpus that cost 28s for one rule, so since v3
+  first does not skip it. On the Windows runner's PE corpus that cost 28.14s for one rule; since v3
   the example rule reads the header by hand (`uint32(uint32(0x3C)) == 0x00004550`,
-  `uint16(uint32(0x3C) + 6) < 12`) and no longer needs `engine = "yara-x"`.
+  `uint16(uint32(0x3C) + 6) < 12`), the same corpus takes 0.32s, and the rule no longer needs
+  `engine = "yara-x"`.
 
 Equivalent CLI, if you prefer the `yr` binary:
 
@@ -350,9 +351,6 @@ yr scan -C dist/triage.yarc corpus/  # compiled bundle
 
 - SAST: `bandit` on the scripts on every PR; `pip-audit` on the dependencies; weekly Dependabot
   for pip and GitHub Actions.
-- **Aikido**: the workspace rule asks for an Aikido scan of generated code, but the server needs an
-  interactive login that has not happened yet. Bandit + pip-audit cover the gap; the Aikido scan
-  stays **pending** until the login (`/aikido:setup`).
 - How to report an FP, a bypass or a CI problem: [`SECURITY.md`](SECURITY.md).
 
 ## License
