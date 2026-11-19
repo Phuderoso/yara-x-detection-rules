@@ -9,7 +9,7 @@ fora das fixtures). Idades em faixas para o arquivo não mudar todo dia.
 
 Uso:
     python scripts/health.py                 # reescreve docs/health.md
-    python scripts/health.py --check         # exit 1 se estiver desatualizado
+    python scripts/health.py --check         # exit 1 se o conteúdo (exceto faixas de data) estiver desatualizado
     python scripts/health.py --as-of 2026-11-09 --stale-weeks 12
 """
 
@@ -19,6 +19,7 @@ import argparse
 import datetime as dt
 import difflib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -206,8 +207,45 @@ def render(rows: list[dict[str, Any]], *, as_of: dt.date, stale_weeks: int, base
     return "\n".join(out)
 
 
+_AGE_BAND_LABELS = frozenset(label for _, label in AGE_BANDS) | {"> 1 ano"}
+_WEEKS_BAND_RE = re.compile(r"^(esta semana|≤ \d+ sem|> \d+ sem)$")
+_CANDIDATES_HEADING = "## Candidatas a `deprecated`"
+
+
+def _normalize_cell(cell: str) -> str:
+    """Faixas de idade/semanas dependem só de 'hoje'; 'nunca' e '?' são conteúdo real."""
+    s = cell.strip()
+    if s in _AGE_BAND_LABELS or _WEEKS_BAND_RE.match(s):
+        return "<faixa>"
+    return s
+
+
+def _normalize_table_line(ln: str) -> str:
+    if not ln.startswith("|") or set(ln.replace("|", "").strip()) <= set("-:"):
+        return ln
+    parts = ln.split("|")
+    mid = [f" {_normalize_cell(c)} " for c in parts[1:-1]]
+    return "|".join([parts[0], *mid, parts[-1]])
+
+
 def _comparable(text: str) -> list[str]:
-    return [ln for ln in text.splitlines() if "Referência: " not in ln]
+    """Painel sem deriva de calendário: omitir referência, faixas e a lista de candidatas."""
+    out: list[str] = []
+    skipping_candidates = False
+    for ln in text.splitlines():
+        if "Referência: " in ln:
+            continue
+        if ln.startswith(_CANDIDATES_HEADING):
+            out.append(ln)
+            skipping_candidates = True
+            continue
+        if skipping_candidates:
+            if ln.startswith("## "):
+                skipping_candidates = False
+            else:
+                continue
+        out.append(_normalize_table_line(ln))
+    return out
 
 
 def _display(path: Path) -> str:
@@ -223,7 +261,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline", type=Path, default=BASELINE_PATH)
     ap.add_argument("--activity", type=Path, default=yrlib.ACTIVITY_PATH)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    ap.add_argument("--check", action="store_true", help="não escreve; exit 1 se o arquivo estiver desatualizado")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="não escreve; exit 1 se o conteúdo (exceto faixas de data) estiver desatualizado",
+    )
     ap.add_argument("--as-of", type=dt.date.fromisoformat, default=None, help="data de referência (default hoje)")
     ap.add_argument("--stale-weeks", type=int, default=12)
     args = ap.parse_args(argv)
@@ -238,7 +280,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         current = args.out.read_text(encoding="utf-8") if args.out.exists() else ""
         if _comparable(current) == _comparable(text):
-            print(f"{_display(args.out)} atualizado")
+            if current != text:
+                diff = difflib.unified_diff(
+                    current.splitlines(), text.splitlines(), fromfile="commitado", tofile="gerado", lineterm="", n=1
+                )
+                print("\n".join(diff))
+                print(
+                    f"\n::warning::{args.out.name} com faixas de data desatualizadas; rode `make health` e commite",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"{_display(args.out)} atualizado")
             return 0
         diff = difflib.unified_diff(
             current.splitlines(), text.splitlines(), fromfile="commitado", tofile="gerado", lineterm="", n=1

@@ -95,20 +95,54 @@ def test_unproven_flag_and_bands(tmp_path: Path) -> None:
     assert health.weeks_band(100, 12) == "> 12 sem"
 
 
-def test_check_fails_when_stale_and_ignores_reference_date(tmp_path: Path) -> None:
+def test_check_ignores_calendar_bands_but_catches_content(tmp_path: Path) -> None:
     rules, baseline, activity = _repo(tmp_path, fp=False, last_match=None)
     out = tmp_path / "health.md"
     common = ["--rules", str(rules), "--baseline", str(baseline), "--activity", str(activity), "--out", str(out)]
     assert health.main([*common, "--as-of", "2026-11-09"]) == 0
     assert health.main([*common, "--check", "--as-of", "2026-11-09"]) == 0
     assert health.main([*common, "--check", "--as-of", "2026-11-10"]) == 0  # só a data de referência mudou
-    assert health.main([*common, "--check", "--as-of", "2027-03-01"]) == 1  # cruzou a faixa "> 1 ano"
-    # FP novo na baseline muda o painel
+    assert health.main([*common, "--check", "--as-of", "2027-03-01"]) == 0  # cruzou a faixa "> 1 ano"
+    # FP novo na baseline é conteúdo real
     b = json.loads(baseline.read_text())
     b["rules"]["MAL_Win_Test_Old"]["fp_total"] = 1
     b["rules"]["MAL_Win_Test_Old"]["last_fp"] = "2026-11-08"
     baseline.write_text(json.dumps(b))
     assert health.main([*common, "--check", "--as-of", "2026-11-09"]) == 1
+
+
+def test_check_ignores_weeks_band_but_catches_new_or_removed_activity(tmp_path: Path) -> None:
+    rules, baseline, activity = _repo(tmp_path, fp=False, last_match="2026-11-09")
+    out = tmp_path / "health.md"
+    common = ["--rules", str(rules), "--baseline", str(baseline), "--activity", str(activity), "--out", str(out)]
+    assert health.main([*common, "--as-of", "2026-11-09"]) == 0  # "esta semana"
+    assert health.main([*common, "--check", "--as-of", "2026-11-16"]) == 0  # "≤ 12 sem"
+    activity.write_text('{"schema": 1, "rules": {}}')
+    assert health.main([*common, "--check", "--as-of", "2026-11-09"]) == 1  # último match sumiu
+
+
+def test_check_ignores_deprecate_list_crossing_stale_weeks(tmp_path: Path) -> None:
+    rules, baseline, activity = _repo(tmp_path, fp=True, last_match="2026-11-01")
+    out = tmp_path / "health.md"
+    common = ["--rules", str(rules), "--baseline", str(baseline), "--activity", str(activity), "--out", str(out)]
+    assert health.main([*common, "--as-of", "2026-11-09"]) == 0  # casou recentemente: não é candidata
+    assert (
+        health.main([*common, "--check", "--as-of", "2027-03-01"]) == 0
+    )  # passou de 12 semanas: lista muda, conteúdo não
+
+
+def test_check_catches_added_or_removed_rule(tmp_path: Path) -> None:
+    rules, baseline, activity = _repo(tmp_path, fp=False, last_match=None)
+    out = tmp_path / "health.md"
+    common = ["--rules", str(rules), "--baseline", str(baseline), "--activity", str(activity), "--out", str(out)]
+    assert health.main([*common, "--as-of", "2026-11-09"]) == 0
+    (rules / "a.yar").unlink()
+    assert health.main([*common, "--check", "--as-of", "2026-11-09"]) == 1
+
+
+def test_repo_health_panel_tolerates_future_as_of() -> None:
+    """Deriva pura de calendário no painel commitado (ex.: 2026-12-09) não quebra a CI."""
+    assert health.main(["--check", "--as-of", "2026-12-10"]) == 0
 
 
 def test_record_activity_roundtrip(tmp_path: Path) -> None:
